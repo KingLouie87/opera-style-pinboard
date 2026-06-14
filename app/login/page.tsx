@@ -1,6 +1,6 @@
+import { redirect } from 'next/navigation';
 import { LoginForm } from '@/components/LoginForm';
 import { createClient } from '@/lib/supabase/server';
-import { redirect } from 'next/navigation';
 
 export default async function LoginPage() {
   const supabase = await createClient();
@@ -9,17 +9,17 @@ export default async function LoginPage() {
   if (data.user) redirect('/boards');
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-5">
-      <div className="glass-strong w-full max-w-md rounded-[2rem] p-8 shadow-soft">
-        <div className="mb-8">
-          <p className="font-mono text-xs uppercase tracking-[0.32em] text-[var(--accent)]">Private Pinboard</p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight">Dein visuelles Board.</h1>
-          <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-            Melde dich mit E-Mail und Passwort an. Danach kannst du Boards, Bereiche, Links und Bilder geräteübergreifend nutzen.
-          </p>
+    <main className="grid min-h-screen place-items-center px-5 py-10">
+      <section className="glass-strong w-full max-w-[460px] rounded-[28px] p-7 md:p-9">
+        <p className="font-mono text-xs uppercase tracking-[0.36em] text-[var(--accent)]">Private Pinboard</p>
+        <h1 className="mt-5 text-4xl font-semibold tracking-[-0.06em] text-white">Dein visuelles Board.</h1>
+        <p className="mt-4 max-w-sm text-sm leading-7 text-[var(--muted)]">
+          Melde dich mit E-Mail und Passwort an. Danach kannst du Boards, Bereiche, Links und Bilder geräteübergreifend nutzen.
+        </p>
+        <div className="mt-8">
+          <LoginForm />
         </div>
-        <LoginForm />
-      </div>
+      </section>
     </main>
   );
 }

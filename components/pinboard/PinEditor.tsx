@@ -5,6 +5,7 @@ import { ImagePlus, Link as LinkIcon, Loader2, Save, X } from 'lucide-react';
 import { BoardSection, LinkPreview, Pin } from '@/lib/types';
 import { createClient } from '@/lib/supabase/browser';
 import { nextPosition } from '@/lib/position';
+import { ImagePicker } from './ImagePicker';
 
 type Draft = {
   title: string;
@@ -17,6 +18,14 @@ type Draft = {
   status: string;
   color: string;
 };
+
+
+function normalizeOptionalUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
 
 function pinToDraft(pin?: Pin | null): Draft {
   return {
@@ -62,7 +71,11 @@ export function PinEditor({
   }
 
   async function loadPreview() {
-    if (!draft.url.trim()) return;
+    const url = normalizeOptionalUrl(draft.url);
+    if (!url) {
+      setPreview(null);
+      return;
+    }
     setLoadingPreview(true);
     setError('');
     setPreview(null);
@@ -70,7 +83,7 @@ export function PinEditor({
       const response = await fetch('/api/link-preview', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ url: draft.url })
+        body: JSON.stringify({ url })
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error ?? 'Preview konnte nicht geladen werden.');
@@ -88,6 +101,10 @@ export function PinEditor({
   }
 
   async function chooseRemoteImage(imageUrl: string) {
+    if (!imageUrl) {
+      setDraft(current => ({ ...current, image_url: '', image_path: '' }));
+      return;
+    }
     setUploading(true);
     setError('');
     try {
@@ -108,6 +125,7 @@ export function PinEditor({
 
   async function uploadOwnImage(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
+    event.target.value = '';
     if (!file) return;
     if (!file.type.startsWith('image/')) {
       setError('Bitte wähle eine Bilddatei aus.');
@@ -168,7 +186,7 @@ export function PinEditor({
       user_id: userData.user.id,
       title: draft.title.trim() || null,
       description: draft.description.trim() || null,
-      url: draft.url.trim() || null,
+      url: normalizeOptionalUrl(draft.url) || null,
       image_url: draft.image_url || null,
       image_path: draft.image_path || null,
       notes: draft.notes.trim() || null,
@@ -189,78 +207,86 @@ export function PinEditor({
       return;
     }
     if (data) {
-      if (draft.image_path) {
-        await supabase.from('pin_images').update({ pin_id: data.id }).eq('storage_path', draft.image_path);
-      }
+      if (draft.image_path) await supabase.from('pin_images').update({ pin_id: data.id }).eq('storage_path', draft.image_path);
       onSaved(data as Pin);
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/35 p-3 backdrop-blur-sm md:p-6" role="dialog" aria-modal="true">
-      <div className="ml-auto flex h-full w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] bg-[var(--panel-strong)] shadow-2xl backdrop-blur-2xl">
+    <div className="fixed inset-0 z-50 bg-black/60 p-3 backdrop-blur-md md:p-6" role="dialog" aria-modal="true">
+      <div className="ml-auto flex h-full w-full max-w-3xl flex-col overflow-hidden rounded-[24px] border border-[var(--line-strong)] bg-[var(--panel-strong)] shadow-2xl">
         <header className="flex items-center justify-between border-b border-[var(--line)] p-5">
           <div>
-            <p className="font-mono text-xs uppercase tracking-[0.24em] text-[var(--accent)]">{existingPin ? 'Pin bearbeiten' : 'Neuer Pin'}</p>
-            <h2 className="text-2xl font-semibold tracking-tight">{section.title}</h2>
+            <p className="font-mono text-xs uppercase tracking-[0.28em] text-[var(--accent)]">{existingPin ? 'Pin bearbeiten' : 'Neuer Pin'}</p>
+            <h2 className="mt-1 text-2xl font-semibold tracking-[-0.04em]">{section.title}</h2>
           </div>
-          <button onClick={onClose} className="rounded-2xl p-2 hover:bg-black/5 dark:hover:bg-white/10"><X /></button>
+          <button type="button" onClick={onClose} className="btn-ghost h-10 w-10"><X size={18} /></button>
         </header>
 
         <form onSubmit={savePin} className="board-scroll flex-1 space-y-5 overflow-y-auto p-5">
-          <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-            <input value={draft.url} onChange={event => setField('url', event.target.value)} placeholder="Link einfügen" className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 outline-none focus:border-[var(--accent)] dark:bg-white/10" />
-            <button type="button" onClick={loadPreview} disabled={loadingPreview || !draft.url.trim()} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--line)] px-4 py-3 font-medium hover:bg-black/5 disabled:opacity-50 dark:hover:bg-white/10">
-              {loadingPreview ? <Loader2 className="animate-spin" size={18} /> : <LinkIcon size={18} />} Preview laden
-            </button>
-          </div>
-
-          {preview && (
-            <div className="rounded-[1.5rem] border border-[var(--line)] bg-white/40 p-4 dark:bg-white/10">
-              <p className="mb-3 text-sm font-medium">Bild auswählen</p>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                {preview.images.map(image => (
-                  <button key={image} type="button" onClick={() => chooseRemoteImage(image)} className="overflow-hidden rounded-2xl border border-[var(--line)] bg-black/5 transition hover:scale-[1.02] hover:border-[var(--accent)]" title={image}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={image} alt="" className="h-28 w-full object-cover" />
-                  </button>
-                ))}
-              </div>
-              {!preview.images.length && <p className="text-sm text-[var(--muted)]">Keine Bilder gefunden. Du kannst ein eigenes Bild hochladen.</p>}
+          <section className="rounded-[18px] border border-[var(--line)] bg-white/[0.035] p-4">
+            <p className="mb-3 text-sm font-semibold text-[var(--text-soft)]">Link und Website-Bilder</p>
+            <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+              <input value={draft.url} onChange={event => setField('url', event.target.value)} placeholder="Link optional einfügen" className="field" />
+              <button type="button" onClick={loadPreview} disabled={loadingPreview || !draft.url.trim()} className="btn-ghost px-4 py-3 text-sm font-semibold disabled:opacity-50">
+                {loadingPreview ? <Loader2 className="animate-spin" size={18} /> : <LinkIcon size={18} />} Bilder laden
+              </button>
             </div>
-          )}
+            {preview && <div className="mt-4"><ImagePicker images={preview.images} selected={draft.image_url} onSelect={chooseRemoteImage} disabled={uploading} /></div>}
+          </section>
 
-          <div className="grid gap-5 md:grid-cols-[220px_1fr]">
-            <div className="space-y-3">
-              <div className="grid min-h-52 place-items-center overflow-hidden rounded-[1.5rem] border border-dashed border-[var(--line)] bg-white/40 dark:bg-white/10">
+          <div className="grid gap-5 md:grid-cols-[240px_1fr]">
+            <aside className="space-y-3">
+              <div className="grid min-h-56 place-items-center overflow-hidden rounded-[18px] border border-dashed border-[var(--line)] bg-white/[0.035]">
                 {draft.image_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={draft.image_url} alt="Pin Bild" className="h-full min-h-52 w-full object-cover" />
+                  <img src={draft.image_url} alt="Pin Bild" className="h-full min-h-56 w-full object-cover" />
                 ) : (
                   <div className="text-center text-sm text-[var(--muted)]"><ImagePlus className="mx-auto mb-2" /> Kein Bild</div>
                 )}
               </div>
-              <label className="block cursor-pointer rounded-2xl border border-[var(--line)] px-4 py-3 text-center text-sm font-medium hover:bg-black/5 dark:hover:bg-white/10">
+              <label className="btn-ghost block cursor-pointer px-4 py-3 text-center text-sm font-semibold">
                 {uploading ? 'Bild wird verarbeitet ...' : 'Eigenes Bild hochladen'}
                 <input type="file" accept="image/*" onChange={uploadOwnImage} className="hidden" />
               </label>
-              {draft.image_url && <button type="button" onClick={() => setDraft(current => ({ ...current, image_url: '', image_path: '' }))} className="w-full rounded-2xl px-4 py-2 text-sm text-red-500 hover:bg-red-500/10">Bild entfernen</button>}
-            </div>
+              {draft.image_url && <button type="button" onClick={() => setDraft(current => ({ ...current, image_url: '', image_path: '' }))} className="btn-ghost w-full px-4 py-2 text-sm font-semibold text-[var(--danger)]">Bild entfernen</button>}
+            </aside>
 
-            <div className="space-y-3">
-              <input value={draft.title} onChange={event => setField('title', event.target.value)} placeholder="Überschrift optional" className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 outline-none focus:border-[var(--accent)] dark:bg-white/10" />
-              <textarea value={draft.description} onChange={event => setField('description', event.target.value)} placeholder="Beschreibung optional" rows={4} className="w-full resize-none rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 outline-none focus:border-[var(--accent)] dark:bg-white/10" />
-              <textarea value={draft.notes} onChange={event => setField('notes', event.target.value)} placeholder="Interne Notiz optional" rows={4} className="w-full resize-none rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 outline-none focus:border-[var(--accent)] dark:bg-white/10" />
-              <input value={draft.tags} onChange={event => setField('tags', event.target.value)} placeholder="Tags, durch Komma getrennt" className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 outline-none focus:border-[var(--accent)] dark:bg-white/10" />
-              <input value={draft.status} onChange={event => setField('status', event.target.value)} placeholder="Status optional, z. B. Wichtig" className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 outline-none focus:border-[var(--accent)] dark:bg-white/10" />
-            </div>
+            <section className="space-y-4">
+              <label className="block text-sm font-medium text-[var(--text-soft)]">
+                Überschrift
+                <input value={draft.title} onChange={event => setField('title', event.target.value)} placeholder="Kurzer, prägnanter Titel" className="field mt-2 text-lg font-semibold" />
+              </label>
+              <label className="block text-sm font-medium text-[var(--text-soft)]">
+                Beschreibung
+                <textarea value={draft.description} onChange={event => setField('description', event.target.value)} placeholder="Beschreibung oder kurzer Kontext" rows={5} className="field mt-2 resize-none leading-6" />
+              </label>
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="block text-sm font-medium text-[var(--text-soft)]">
+                  Tags
+                  <input value={draft.tags} onChange={event => setField('tags', event.target.value)} placeholder="Design, Recherche, Wichtig" className="field mt-2" />
+                </label>
+                <label className="block text-sm font-medium text-[var(--text-soft)]">
+                  Status
+                  <input value={draft.status} onChange={event => setField('status', event.target.value)} placeholder="Offen, Wichtig, Erledigt" className="field mt-2" />
+                </label>
+              </div>
+              <label className="block text-sm font-medium text-[var(--text-soft)]">
+                Dezente Akzentfarbe
+                <input value={draft.color} onChange={event => setField('color', event.target.value)} placeholder="#7aa7ff oder leer lassen" className="field mt-2" />
+              </label>
+              <label className="block text-sm font-medium text-[var(--text-soft)]">
+                Interne Notiz
+                <textarea value={draft.notes} onChange={event => setField('notes', event.target.value)} placeholder="Nur für dich. Wird auf der Karte gedimmt und kursiv dargestellt." rows={4} className="field mt-2 resize-none italic leading-6" />
+              </label>
+            </section>
           </div>
 
-          {error && <p className="rounded-2xl bg-red-500/10 p-3 text-sm text-red-600 dark:text-red-300">{error}</p>}
+          {error && <p className="rounded-[14px] border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
 
-          <footer className="sticky bottom-0 -mx-5 -mb-5 flex justify-end gap-3 border-t border-[var(--line)] bg-[var(--panel-strong)] p-5 backdrop-blur-2xl">
-            <button type="button" onClick={onClose} className="rounded-2xl border border-[var(--line)] px-5 py-3 font-medium hover:bg-black/5 dark:hover:bg-white/10">Abbrechen</button>
-            <button disabled={saving || uploading} className="inline-flex items-center gap-2 rounded-2xl bg-[var(--accent)] px-5 py-3 font-semibold text-white disabled:opacity-60">
+          <footer className="flex items-center justify-end gap-3 border-t border-[var(--line)] pt-5">
+            <button type="button" onClick={onClose} className="btn-ghost px-4 py-3 text-sm font-semibold">Abbrechen</button>
+            <button disabled={saving || uploading} className="btn-primary px-5 py-3 disabled:opacity-60">
               {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />} Speichern
             </button>
           </footer>

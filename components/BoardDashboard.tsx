@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useMemo, useState } from 'react';
-import { LogOut, Plus, Search, Sparkles } from 'lucide-react';
+import { ChangeEvent, FormEvent, useMemo, useRef, useState } from 'react';
+import { BookOpen, ImagePlus, LogOut, Plus, Search, Sparkles, Upload } from 'lucide-react';
 import { Board } from '@/lib/types';
 import { createClient } from '@/lib/supabase/browser';
 
@@ -12,6 +12,7 @@ export function BoardDashboard({ initialBoards, userEmail }: { initialBoards: Bo
   const [description, setDescription] = useState('');
   const [search, setSearch] = useState('');
   const [creating, setCreating] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const supabase = createClient();
 
   const filtered = useMemo(() => {
@@ -41,63 +42,98 @@ export function BoardDashboard({ initialBoards, userEmail }: { initialBoards: Bo
     setCreating(false);
   }
 
+  async function uploadBoardCover(board: Board, event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !file.type.startsWith('image/')) return;
+
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) return;
+
+    const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+    const path = `${userData.user.id}/boards/${board.id}-${crypto.randomUUID()}.${extension}`;
+    const { error: uploadError } = await supabase.storage.from('pin-images').upload(path, file, {
+      contentType: file.type,
+      upsert: false,
+      cacheControl: '31536000'
+    });
+    if (uploadError) return;
+
+    const coverUrl = `/api/images/${path}`;
+    const { data } = await supabase.from('boards').update({ cover_url: coverUrl, cover_path: path }).eq('id', board.id).select('*').single();
+    if (data) setBoards(current => current.map(item => (item.id === board.id ? (data as Board) : item)));
+  }
+
   async function signOut() {
     await supabase.auth.signOut();
     window.location.href = '/login';
   }
 
   return (
-    <main className="min-h-screen p-5 md:p-8">
-      <header className="mx-auto flex max-w-7xl flex-col gap-6 md:flex-row md:items-center md:justify-between">
+    <main className="min-h-screen p-4 md:p-8">
+      <header className="mx-auto flex max-w-7xl flex-col gap-6 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="font-mono text-xs uppercase tracking-[0.32em] text-[var(--accent)]">Opera Inspired Pinboard</p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight md:text-6xl">Boards</h1>
+          <p className="font-mono text-xs uppercase tracking-[0.36em] text-[var(--accent)]">Private Workspace</p>
+          <h1 className="mt-3 text-4xl font-semibold tracking-[-0.06em] md:text-6xl">Boards</h1>
           <p className="mt-3 text-sm text-[var(--muted)]">Angemeldet als {userEmail}</p>
         </div>
-        <button onClick={signOut} className="inline-flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-white/50 px-4 py-3 text-sm font-medium shadow-sm transition hover:bg-white/80 dark:bg-white/10 dark:hover:bg-white/15">
-          <LogOut size={17} /> Abmelden
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/notes" className="btn-ghost px-4 py-3 text-sm font-semibold"><BookOpen size={17} /> Notizen</Link>
+          <button onClick={signOut} className="btn-ghost px-4 py-3 text-sm font-semibold"><LogOut size={17} /> Abmelden</button>
+        </div>
       </header>
 
       <section className="mx-auto mt-8 grid max-w-7xl gap-5 lg:grid-cols-[380px_1fr]">
-        <form onSubmit={createBoard} className="glass-strong rounded-[2rem] p-5 shadow-soft">
+        <form onSubmit={createBoard} className="glass-strong rounded-[24px] p-5">
           <div className="mb-5 flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[var(--accent)] text-white"><Sparkles size={20} /></span>
+            <span className="grid h-11 w-11 place-items-center rounded-[14px] bg-[var(--accent-soft)] text-[var(--accent)]"><Sparkles size={20} /></span>
             <div>
               <h2 className="font-semibold">Neues Board</h2>
               <p className="text-sm text-[var(--muted)]">Sammlung, Projekt oder Recherche anlegen.</p>
             </div>
           </div>
           <div className="space-y-3">
-            <input value={title} onChange={event => setTitle(event.target.value)} placeholder="Board Name" className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 outline-none focus:border-[var(--accent)] dark:bg-white/10" />
-            <textarea value={description} onChange={event => setDescription(event.target.value)} placeholder="Beschreibung optional" rows={4} className="w-full resize-none rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 outline-none focus:border-[var(--accent)] dark:bg-white/10" />
-            <button disabled={creating || !title.trim()} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] px-4 py-3 font-semibold text-white transition hover:scale-[1.01] disabled:opacity-50">
+            <input value={title} onChange={event => setTitle(event.target.value)} placeholder="Board Name" className="field" />
+            <textarea value={description} onChange={event => setDescription(event.target.value)} placeholder="Beschreibung optional" rows={4} className="field resize-none" />
+            <button disabled={creating || !title.trim()} className="btn-primary w-full px-4 py-3 disabled:opacity-50">
               <Plus size={18} /> Board erstellen
             </button>
           </div>
         </form>
 
         <div className="space-y-4">
-          <label className="glass flex items-center gap-3 rounded-3xl px-4 py-3">
+          <label className="glass flex items-center gap-3 rounded-[18px] px-4 py-3">
             <Search size={18} className="text-[var(--muted)]" />
-            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Boards suchen ..." className="w-full bg-transparent outline-none" />
+            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Boards suchen ..." className="w-full bg-transparent outline-none placeholder:text-white/30" />
           </label>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map(board => (
-              <Link key={board.id} href={`/boards/${board.id}`} className="group glass-strong block overflow-hidden rounded-[2rem] p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-soft">
-                <div className="mb-7 h-32 rounded-[1.5rem] bg-gradient-to-br from-red-500/20 via-white/50 to-black/10 p-4 dark:via-white/10">
-                  <div className="h-full rounded-[1.15rem] border border-white/40 bg-white/25 backdrop-blur-md dark:bg-black/20" />
-                </div>
-                <h2 className="text-xl font-semibold tracking-tight group-hover:text-[var(--accent)]">{board.title}</h2>
-                <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--muted)]">{board.description || 'Keine Beschreibung'}</p>
-              </Link>
+              <article key={board.id} className="group surface overflow-hidden rounded-[22px] transition hover:-translate-y-1 hover:border-white/20">
+                <Link href={`/boards/${board.id}`} className="block">
+                  <div className="relative h-36 overflow-hidden bg-gradient-to-br from-white/10 via-[var(--accent-soft)] to-black/30">
+                    {board.cover_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={board.cover_url} alt="" className="h-full w-full object-cover opacity-90 transition duration-500 group-hover:scale-105" />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-[var(--muted)]"><ImagePlus size={28} /></div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                  </div>
+                  <div className="p-5">
+                    <h2 className="text-xl font-semibold tracking-[-0.03em] group-hover:text-[var(--accent)]">{board.title}</h2>
+                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--muted)]">{board.description || 'Keine Beschreibung'}</p>
+                  </div>
+                </Link>
+                <label className="mx-5 mb-5 flex cursor-pointer items-center justify-center gap-2 rounded-[12px] border border-[var(--line)] bg-white/[0.04] px-3 py-2 text-xs font-semibold text-[var(--text-soft)] hover:bg-white/[0.075]">
+                  <Upload size={14} /> Board-Bild ändern
+                  <input ref={fileInputRef} type="file" accept="image/*" onChange={event => uploadBoardCover(board, event)} className="hidden" />
+                </label>
+              </article>
             ))}
           </div>
 
-          {!filtered.length && (
-            <div className="glass rounded-[2rem] p-8 text-center text-[var(--muted)]">Noch kein passendes Board gefunden.</div>
-          )}
+          {!filtered.length && <div className="glass rounded-[22px] p-8 text-center text-[var(--muted)]">Noch kein passendes Board gefunden.</div>}
         </div>
       </section>
     </main>

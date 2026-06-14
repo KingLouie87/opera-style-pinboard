@@ -5,14 +5,15 @@ import { createClient } from '@/lib/supabase/server';
 export default async function BoardsPage() {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
 
-  if (!userData.user) redirect('/login');
+  if (!user) redirect('/login');
 
   const { data: boards } = await supabase
     .from('boards')
     .select('*')
-    .eq('user_id', userData.user.id)
+    .eq('user_id', user.id)
     .order('updated_at', { ascending: false });
 
-  return <BoardDashboard userEmail={userData.user.email ?? ''} initialBoards={boards ?? []} />;
+  return <BoardDashboard userEmail={user.email ?? ''} initialBoards={boards ?? []} />;
 }

@@ -8,12 +8,12 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: 'Pinboard',
-    statusBarStyle: 'default'
+    statusBarStyle: 'black-translucent'
   }
 };
 
 export const viewport: Viewport = {
-  themeColor: '#e44332',
+  themeColor: '#06070a',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1

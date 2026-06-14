@@ -97,3 +97,10 @@ components/
 lib/
 supabase/schema.sql
 ```
+
+
+## V2 Upgrade
+
+Für das Darkmode-/Notizen-Update siehe `docs/V2_UPGRADE.md`.
+
+Wichtig: Vor Nutzung des Notizbereichs muss `supabase/migrations/20260614_pinboard_v2_notes.sql` im Supabase SQL Editor ausgeführt werden.

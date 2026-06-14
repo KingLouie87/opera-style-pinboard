@@ -14,12 +14,13 @@ import {
   useSensors
 } from '@dnd-kit/core';
 import { arrayMove, horizontalListSortingStrategy, SortableContext, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { ArrowLeft, Moon, Plus, RotateCcw, Search, Sun } from 'lucide-react';
+import { ArrowLeft, BookOpen, Plus, RotateCcw, Search, Settings } from 'lucide-react';
 import { Board, BoardSection, Pin } from '@/lib/types';
 import { createClient } from '@/lib/supabase/browser';
 import { normalizePositions, nextPosition } from '@/lib/position';
 import { SectionColumn } from './SectionColumn';
 import { PinEditor } from './PinEditor';
+import { BoardSettingsPanel } from './BoardSettingsPanel';
 
 type EditorState = null | { section: BoardSection; pin?: Pin | null };
 
@@ -35,12 +36,13 @@ function parseId(id: string) {
 }
 
 export function PinboardClient({ board, initialSections, initialPins }: { board: Board; initialSections: BoardSection[]; initialPins: Pin[] }) {
+  const [currentBoard, setCurrentBoard] = useState(board);
   const [sections, setSections] = useState(initialSections);
   const [pins, setPins] = useState(initialPins);
   const [editor, setEditor] = useState<EditorState>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [dark, setDark] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [undo, setUndo] = useState<UndoState>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const supabase = createClient();
@@ -73,7 +75,7 @@ export function PinboardClient({ board, initialSections, initialPins }: { board:
     if (!userData.user) return;
     const { data } = await supabase
       .from('board_sections')
-      .insert({ board_id: board.id, user_id: userData.user.id, title, position: nextPosition(sections) })
+      .insert({ board_id: currentBoard.id, user_id: userData.user.id, title, position: nextPosition(sections) })
       .select('*')
       .single();
     if (data) setSections(current => [...current, data as BoardSection]);
@@ -200,26 +202,27 @@ export function PinboardClient({ board, initialSections, initialPins }: { board:
   }
 
   return (
-    <main className={dark ? 'dark min-h-screen' : 'min-h-screen'}>
+    <main className="min-h-screen">
       <div className="min-h-screen p-4 md:p-6">
-        <header className="glass-strong sticky top-4 z-20 mx-auto mb-5 flex max-w-[1800px] flex-col gap-4 rounded-[2rem] p-4 shadow-soft md:flex-row md:items-center md:justify-between">
+        <header className="glass-strong sticky top-4 z-20 mx-auto mb-5 flex max-w-[1800px] flex-col gap-4 rounded-[22px] p-4 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
             <Link href="/boards" className="mb-2 inline-flex items-center gap-2 text-sm text-[var(--muted)] hover:text-[var(--accent)]"><ArrowLeft size={16} /> Boards</Link>
-            <h1 className="truncate text-3xl font-semibold tracking-tight md:text-4xl">{board.title}</h1>
-            {board.description && <p className="mt-1 line-clamp-1 text-sm text-[var(--muted)]">{board.description}</p>}
+            <h1 className="truncate text-3xl font-semibold tracking-[-0.05em] md:text-4xl">{currentBoard.title}</h1>
+            {currentBoard.description && <p className="mt-1 line-clamp-1 text-sm text-[var(--muted)]">{currentBoard.description}</p>}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex min-w-56 flex-1 items-center gap-2 rounded-2xl border border-[var(--line)] bg-white/50 px-3 py-2 dark:bg-white/10">
+            <label className="flex min-w-56 flex-1 items-center gap-2 rounded-[14px] border border-[var(--line)] bg-white/[0.055] px-3 py-2">
               <Search size={16} className="text-[var(--muted)]" />
               <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Pins suchen ..." className="w-full bg-transparent text-sm outline-none" />
             </label>
-            <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} className="rounded-2xl border border-[var(--line)] bg-white/50 px-3 py-2 text-sm outline-none dark:bg-white/10">
+            <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} className="rounded-[14px] border border-[var(--line)] bg-white/[0.055] px-3 py-2 text-sm outline-none">
               <option value="">Alle Status</option>
               {statuses.map(status => <option key={status} value={status}>{status}</option>)}
             </select>
-            <button onClick={addSection} className="inline-flex items-center gap-2 rounded-2xl bg-[var(--accent)] px-4 py-2 font-semibold text-white"><Plus size={18} /> Bereich</button>
-            <button onClick={() => setDark(value => !value)} className="rounded-2xl border border-[var(--line)] p-2 hover:bg-black/5 dark:hover:bg-white/10" aria-label="Theme wechseln">{dark ? <Sun size={18} /> : <Moon size={18} />}</button>
+            <Link href="/notes" className="btn-ghost px-4 py-2 text-sm font-semibold"><BookOpen size={18} /> Notizen</Link>
+            <button onClick={addSection} className="btn-primary px-4 py-2"><Plus size={18} /> Bereich</button>
+            <button onClick={() => setSettingsOpen(true)} className="btn-ghost h-10 w-10" aria-label="Board bearbeiten"><Settings size={18} /></button>
           </div>
         </header>
 
@@ -248,7 +251,7 @@ export function PinboardClient({ board, initialSections, initialPins }: { board:
                 />
               ))}
 
-              <button onClick={addSection} className="grid h-80 w-[22rem] shrink-0 place-items-center rounded-[2rem] border border-dashed border-[var(--line)] bg-white/30 text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] dark:bg-white/5">
+              <button onClick={addSection} className="grid h-80 w-[22.5rem] shrink-0 place-items-center rounded-[22px] border border-dashed border-[var(--line)] bg-white/[0.035] text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]">
                 <span className="inline-flex items-center gap-2"><Plus size={18} /> Bereich hinzufügen</span>
               </button>
             </div>
@@ -256,21 +259,30 @@ export function PinboardClient({ board, initialSections, initialPins }: { board:
         </DndContext>
 
         {!sections.length && (
-          <div className="mx-auto mt-10 max-w-xl rounded-[2rem] border border-[var(--line)] bg-white/60 p-8 text-center shadow-soft dark:bg-white/10">
+          <div className="mx-auto mt-10 max-w-xl rounded-[22px] border border-[var(--line)] bg-white/[0.055] p-8 text-center shadow-soft">
             <h2 className="text-2xl font-semibold">Starte mit deinem ersten Bereich.</h2>
             <p className="mt-2 text-[var(--muted)]">Bereiche sind deine frei sortierbaren Zonen, zum Beispiel Recherche, Design, Arbeit oder Später ansehen.</p>
-            <button onClick={addSection} className="mt-5 rounded-2xl bg-[var(--accent)] px-5 py-3 font-semibold text-white">Ersten Bereich erstellen</button>
+            <button onClick={addSection} className="btn-primary mt-5 px-5 py-3">Ersten Bereich erstellen</button>
           </div>
         )}
 
         {editor && (
           <PinEditor
-            boardId={board.id}
+            boardId={currentBoard.id}
             section={editor.section}
             existingPin={editor.pin}
             existingPins={pins}
             onClose={() => setEditor(null)}
             onSaved={onSaved}
+          />
+        )}
+
+        {settingsOpen && (
+          <BoardSettingsPanel
+            board={currentBoard}
+            pins={pins}
+            onClose={() => setSettingsOpen(false)}
+            onBoardSaved={setCurrentBoard}
           />
         )}
       </div>

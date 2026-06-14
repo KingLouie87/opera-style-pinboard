@@ -16,20 +16,41 @@ function checkRateLimit(userId: string) {
     rate.set(userId, { count: 1, reset: now + 60_000 });
     return true;
   }
-  if (current.count >= 40) return false;
+  if (current.count >= 50) return false;
   current.count += 1;
   return true;
 }
 
-function absoluteUrl(value: string | undefined, base: URL) {
+function absoluteUrl(value: string | undefined | null, base: URL) {
   if (!value) return null;
   try {
-    const url = new URL(value, base);
+    const cleaned = value.trim();
+    if (!cleaned || cleaned.startsWith('data:') || cleaned.startsWith('blob:')) return null;
+    const url = new URL(cleaned, base);
     if (!['http:', 'https:'].includes(url.protocol)) return null;
+    url.hash = '';
     return url.toString();
   } catch {
     return null;
   }
+}
+
+function srcsetUrls(value: string | undefined | null) {
+  if (!value) return [];
+  return value
+    .split(',')
+    .map(part => part.trim().split(/\s+/)[0])
+    .filter(Boolean);
+}
+
+function looksLikeUsefulImage(url: string, width?: string, height?: string) {
+  const lower = url.toLowerCase();
+  if (lower.includes('tracking') || lower.includes('pixel') || lower.includes('spacer') || lower.includes('blank.gif')) return false;
+  if (lower.endsWith('.svg') || lower.includes('logo') || lower.includes('favicon')) return false;
+  const w = Number(width || 0);
+  const h = Number(height || 0);
+  if ((w && w < 90) || (h && h < 90)) return false;
+  return true;
 }
 
 export async function POST(request: Request) {
@@ -43,9 +64,7 @@ export async function POST(request: Request) {
     const target = parseHttpUrl(body.url);
     const response = await safeFetch(target.toString());
 
-    if (!response.ok) {
-      return NextResponse.json({ error: `Website konnte nicht geladen werden (${response.status}).` }, { status: 400 });
-    }
+    if (!response.ok) return NextResponse.json({ error: `Website konnte nicht geladen werden (${response.status}).` }, { status: 400 });
 
     const contentType = response.headers.get('content-type') ?? '';
     if (!contentType.includes('text/html') && !contentType.includes('application/xhtml')) {
@@ -66,21 +85,34 @@ export async function POST(request: Request) {
       null;
 
     const imageCandidates: string[] = [];
-    const push = (value: string | undefined) => {
+    const push = (value: string | undefined | null, width?: string, height?: string) => {
       const absolute = absoluteUrl(value, target);
-      if (absolute && !imageCandidates.includes(absolute)) imageCandidates.push(absolute);
+      if (absolute && looksLikeUsefulImage(absolute, width, height) && !imageCandidates.includes(absolute)) imageCandidates.push(absolute);
     };
 
-    push($('meta[property="og:image:secure_url"]').attr('content'));
-    push($('meta[property="og:image"]').attr('content'));
+    push($('meta[property="og:image:secure_url"]').attr('content'), $('meta[property="og:image:width"]').attr('content'), $('meta[property="og:image:height"]').attr('content'));
+    push($('meta[property="og:image"]').attr('content'), $('meta[property="og:image:width"]').attr('content'), $('meta[property="og:image:height"]').attr('content'));
     push($('meta[name="twitter:image"]').attr('content'));
     push($('link[rel="image_src"]').attr('href'));
+
     $('img').each((_, element) => {
-      const src = $(element).attr('src') || $(element).attr('data-src') || $(element).attr('data-lazy-src');
-      push(src);
+      const img = $(element);
+      const width = img.attr('width') || img.attr('data-width');
+      const height = img.attr('height') || img.attr('data-height');
+      push(img.attr('src'), width, height);
+      push(img.attr('data-src'), width, height);
+      push(img.attr('data-lazy-src'), width, height);
+      push(img.attr('data-original'), width, height);
+      for (const src of srcsetUrls(img.attr('srcset'))) push(src, width, height);
+      for (const src of srcsetUrls(img.attr('data-srcset'))) push(src, width, height);
+    });
+
+    $('source').each((_, element) => {
+      for (const src of srcsetUrls($(element).attr('srcset'))) push(src);
     });
 
     const favicon =
+      absoluteUrl($('link[rel="apple-touch-icon"]').attr('href'), target) ||
       absoluteUrl($('link[rel="icon"]').attr('href'), target) ||
       absoluteUrl($('link[rel="shortcut icon"]').attr('href'), target) ||
       absoluteUrl('/favicon.ico', target);
@@ -90,7 +122,7 @@ export async function POST(request: Request) {
       title: title?.trim() || null,
       description: description?.trim() || null,
       favicon,
-      images: imageCandidates.slice(0, 24)
+      images: imageCandidates.slice(0, 48)
     });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Preview fehlgeschlagen.' }, { status: 400 });

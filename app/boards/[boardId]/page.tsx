@@ -6,14 +6,15 @@ export default async function BoardPage({ params }: { params: Promise<{ boardId:
   const { boardId } = await params;
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
 
-  if (!userData.user) redirect('/login');
+  if (!user) redirect('/login');
 
   const { data: board } = await supabase
     .from('boards')
     .select('*')
     .eq('id', boardId)
-    .eq('user_id', userData.user.id)
+    .eq('user_id', user.id)
     .single();
 
   if (!board) notFound();
@@ -22,14 +23,14 @@ export default async function BoardPage({ params }: { params: Promise<{ boardId:
     .from('board_sections')
     .select('*')
     .eq('board_id', boardId)
-    .eq('user_id', userData.user.id)
+    .eq('user_id', user.id)
     .order('position', { ascending: true });
 
   const { data: pins } = await supabase
     .from('pins')
     .select('*')
     .eq('board_id', boardId)
-    .eq('user_id', userData.user.id)
+    .eq('user_id', user.id)
     .is('deleted_at', null)
     .is('archived_at', null)
     .order('position', { ascending: true });
