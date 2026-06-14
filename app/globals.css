@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --bg: #f5f1eb;
+  --panel: rgba(255, 255, 255, 0.78);
+  --panel-strong: rgba(255, 255, 255, 0.94);
+  --ink: #151313;
+  --muted: #786f68;
+  --line: rgba(40, 35, 30, 0.12);
+  --accent: #e44332;
+}
+
+.dark {
+  color-scheme: dark;
+  --bg: #101012;
+  --panel: rgba(29, 29, 33, 0.72);
+  --panel-strong: rgba(37, 37, 42, 0.96);
+  --ink: #f5f0ea;
+  --muted: #a7a09a;
+  --line: rgba(255, 255, 255, 0.10);
+  --accent: #ff4b3a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(228, 67, 50, 0.18), transparent 34rem),
+    radial-gradient(circle at 80% 0%, rgba(255, 255, 255, 0.60), transparent 28rem),
+    var(--bg);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(228, 67, 50, 0.22);
+}
+
+.glass {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(22px);
+}
+
+.glass-strong {
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(22px);
+}
+
+.board-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 111, 104, 0.45) transparent;
+}
+
+.board-scroll::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+.board-scroll::-webkit-scrollbar-thumb {
+  background: rgba(120, 111, 104, 0.34);
+  border-radius: 999px;
+}
+
+.pin-prose a {
+  color: var(--accent);
+  word-break: break-all;
+}
