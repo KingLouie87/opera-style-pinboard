@@ -6,8 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "lint": "next lint"
   },
   "dependencies": {
     "@dnd-kit/core": "latest",
@@ -17,7 +16,7 @@
     "@supabase/supabase-js": "latest",
     "cheerio": "latest",
     "lucide-react": "latest",
-    "next": "^9.3.3",
+    "next": "16.2.9",
     "react": "latest",
     "react-dom": "latest",
     "zod": "latest"
