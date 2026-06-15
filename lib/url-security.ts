@@ -19,7 +19,7 @@ function isPrivateIp(ip: string) {
   if (!net.isIPv4(ip)) return false;
   const numeric = ipToNumber(ip);
   return privateCidrs.some(([range, bits]) => {
-    const mask = bits === 0 ? 0 : (0xffffffff << (32 - bits)) >>> 0;
+    const mask = (0xffffffff << (32 - bits)) >>> 0;
     return (numeric & mask) === (ipToNumber(range) & mask);
   });
 }
