@@ -35,5 +35,5 @@ export default async function BoardPage({ params }: { params: Promise<{ boardId:
     .is('archived_at', null)
     .order('position', { ascending: true });
 
-  return <PinboardClient board={board} initialSections={sections ?? []} initialPins={pins ?? []} />;
+  return <PinboardClient board={board} initialSections={sections ?? []} initialPins={pins ?? []} userEmail={user.email ?? ''} />;
 }

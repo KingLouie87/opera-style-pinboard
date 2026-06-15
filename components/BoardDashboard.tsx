@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { ChangeEvent, FormEvent, useMemo, useRef, useState } from 'react';
-import { BookOpen, ImagePlus, LogOut, Plus, Search, Sparkles, Upload } from 'lucide-react';
+import { ImagePlus, Plus, Search, Sparkles, Upload } from 'lucide-react';
 import { Board } from '@/lib/types';
 import { createClient } from '@/lib/supabase/browser';
+import { AppShell } from '@/components/platform/AppShell';
 
 export function BoardDashboard({ initialBoards, userEmail }: { initialBoards: Board[]; userEmail: string }) {
   const [boards, setBoards] = useState(initialBoards);
@@ -64,78 +65,66 @@ export function BoardDashboard({ initialBoards, userEmail }: { initialBoards: Bo
     if (data) setBoards(current => current.map(item => (item.id === board.id ? (data as Board) : item)));
   }
 
-  async function signOut() {
-    await supabase.auth.signOut();
-    window.location.href = '/login';
-  }
-
   return (
-    <main className="min-h-screen p-4 md:p-8">
-      <header className="mx-auto flex max-w-7xl flex-col gap-6 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="font-mono text-xs uppercase tracking-[0.36em] text-[var(--accent)]">Private Workspace</p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-[-0.06em] md:text-6xl">Boards</h1>
-          <p className="mt-3 text-sm text-[var(--muted)]">Angemeldet als {userEmail}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/notes" className="btn-ghost px-4 py-3 text-sm font-semibold"><BookOpen size={17} /> Notizen</Link>
-          <button onClick={signOut} className="btn-ghost px-4 py-3 text-sm font-semibold"><LogOut size={17} /> Abmelden</button>
-        </div>
-      </header>
-
-      <section className="mx-auto mt-8 grid max-w-7xl gap-5 lg:grid-cols-[380px_1fr]">
-        <form onSubmit={createBoard} className="glass-strong rounded-[24px] p-5">
-          <div className="mb-5 flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-[14px] bg-[var(--accent-soft)] text-[var(--accent)]"><Sparkles size={20} /></span>
+    <AppShell userEmail={userEmail} active="boards">
+      <div className="board-scroll h-full overflow-y-auto pr-1">
+        <header className="premium-hero relative overflow-hidden rounded-[10px] border border-[var(--line)] p-5 md:p-7">
+          <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h2 className="font-semibold">Neues Board</h2>
-              <p className="text-sm text-[var(--muted)]">Sammlung, Projekt oder Recherche anlegen.</p>
+              <p className="section-label text-[var(--accent)]">Private Workspace</p>
+              <h1 className="mt-3 text-4xl font-semibold tracking-[-0.065em] md:text-6xl">Boards</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)]">Visuelle Sammlungen, Rechercheflächen und Projektboards. Angemeldet als {userEmail}</p>
             </div>
+            <label className="search-pill w-full lg:w-[360px]"><Search size={16} /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Boards suchen ..." /></label>
           </div>
-          <div className="space-y-3">
-            <input value={title} onChange={event => setTitle(event.target.value)} placeholder="Board Name" className="field" />
-            <textarea value={description} onChange={event => setDescription(event.target.value)} placeholder="Beschreibung optional" rows={4} className="field resize-none" />
-            <button disabled={creating || !title.trim()} className="btn-primary w-full px-4 py-3 disabled:opacity-50">
-              <Plus size={18} /> Board erstellen
-            </button>
-          </div>
-        </form>
+        </header>
 
-        <div className="space-y-4">
-          <label className="glass flex items-center gap-3 rounded-[18px] px-4 py-3">
-            <Search size={18} className="text-[var(--muted)]" />
-            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Boards suchen ..." className="w-full bg-transparent outline-none placeholder:text-white/30" />
-          </label>
+        <section className="mt-5 grid gap-5 xl:grid-cols-[360px_1fr]">
+          <form onSubmit={createBoard} className="panel h-fit p-4">
+            <div className="mb-5 flex items-center gap-3">
+              <span className="grid h-10 w-10 place-items-center rounded-[8px] bg-[var(--accent-soft)] text-[var(--accent)]"><Sparkles size={19} /></span>
+              <div>
+                <h2 className="font-semibold">Neues Board</h2>
+                <p className="text-sm text-[var(--muted)]">Sammlung, Projekt oder Recherche anlegen.</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <input value={title} onChange={event => setTitle(event.target.value)} placeholder="Board Name" className="field" />
+              <textarea value={description} onChange={event => setDescription(event.target.value)} placeholder="Beschreibung optional" rows={4} className="field resize-none" />
+              <button disabled={creating || !title.trim()} className="btn-primary w-full px-4 py-3 disabled:opacity-50"><Plus size={18} /> Board erstellen</button>
+            </div>
+          </form>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid auto-rows-fr gap-4 md:grid-cols-2 2xl:grid-cols-3">
             {filtered.map(board => (
-              <article key={board.id} className="group surface overflow-hidden rounded-[22px] transition hover:-translate-y-1 hover:border-white/20">
+              <article key={board.id} className="group surface overflow-hidden transition hover:-translate-y-0.5 hover:border-white/20">
                 <Link href={`/boards/${board.id}`} className="block">
-                  <div className="relative h-36 overflow-hidden bg-gradient-to-br from-white/10 via-[var(--accent-soft)] to-black/30">
+                  <div className="relative h-40 overflow-hidden bg-gradient-to-br from-white/10 via-[var(--accent-soft)] to-black/30">
                     {board.cover_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={board.cover_url} alt="" className="h-full w-full object-cover opacity-90 transition duration-500 group-hover:scale-105" />
+                      <img src={board.cover_url} alt="" className="h-full w-full object-cover opacity-90 transition duration-500 group-hover:scale-[1.035]" />
                     ) : (
                       <div className="flex h-full items-center justify-center text-[var(--muted)]"><ImagePlus size={28} /></div>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/72 via-black/14 to-transparent" />
+                    <div className="absolute bottom-3 left-3 right-3">
+                      <h2 className="line-clamp-1 text-xl font-semibold tracking-[-0.035em] text-white">{board.title}</h2>
+                    </div>
                   </div>
-                  <div className="p-5">
-                    <h2 className="text-xl font-semibold tracking-[-0.03em] group-hover:text-[var(--accent)]">{board.title}</h2>
-                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--muted)]">{board.description || 'Keine Beschreibung'}</p>
+                  <div className="p-4">
+                    <p className="line-clamp-2 text-sm leading-6 text-[var(--muted)]">{board.description || 'Keine Beschreibung'}</p>
                   </div>
                 </Link>
-                <label className="mx-5 mb-5 flex cursor-pointer items-center justify-center gap-2 rounded-[12px] border border-[var(--line)] bg-white/[0.04] px-3 py-2 text-xs font-semibold text-[var(--text-soft)] hover:bg-white/[0.075]">
+                <label className="mx-4 mb-4 flex cursor-pointer items-center justify-center gap-2 rounded-[7px] border border-[var(--line)] bg-white/[0.04] px-3 py-2 text-xs font-semibold text-[var(--text-soft)] hover:bg-white/[0.075]">
                   <Upload size={14} /> Board-Bild ändern
                   <input ref={fileInputRef} type="file" accept="image/*" onChange={event => uploadBoardCover(board, event)} className="hidden" />
                 </label>
               </article>
             ))}
+            {!filtered.length && <div className="empty-state col-span-full"><strong>No Boards</strong><span>Lege ein Board an, um Pins, Links und visuelle Inspirationen zu sammeln.</span></div>}
           </div>
-
-          {!filtered.length && <div className="glass rounded-[22px] p-8 text-center text-[var(--muted)]">Noch kein passendes Board gefunden.</div>}
-        </div>
-      </section>
-    </main>
+        </section>
+      </div>
+    </AppShell>
   );
 }

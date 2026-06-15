@@ -79,7 +79,7 @@ export function BoardSettingsPanel({ board, pins, onClose, onBoardSaved }: { boa
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 p-3 backdrop-blur-md md:p-6" role="dialog" aria-modal="true">
-      <div className="ml-auto flex h-full w-full max-w-xl flex-col overflow-hidden rounded-[24px] border border-[var(--line-strong)] bg-[var(--panel-strong)] shadow-2xl">
+      <div className="ml-auto flex h-full w-full max-w-xl flex-col overflow-hidden rounded-[7px] border border-[var(--line-strong)] bg-[var(--panel-strong)] shadow-2xl">
         <header className="flex items-center justify-between border-b border-[var(--line)] p-5">
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.28em] text-[var(--accent)]">Board Settings</p>
@@ -100,7 +100,7 @@ export function BoardSettingsPanel({ board, pins, onClose, onBoardSaved }: { boa
 
           <div>
             <p className="mb-2 text-sm font-medium text-[var(--text-soft)]">Titelbild</p>
-            <div className="grid min-h-48 place-items-center overflow-hidden rounded-[18px] border border-dashed border-[var(--line)] bg-white/[0.04]">
+            <div className="grid min-h-48 place-items-center overflow-hidden rounded-[8px] border border-dashed border-[var(--line)] bg-white/[0.04]">
               {coverUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={coverUrl} alt="Board Titelbild" className="h-full min-h-48 w-full object-cover" />
@@ -126,7 +126,7 @@ export function BoardSettingsPanel({ board, pins, onClose, onBoardSaved }: { boa
               <p className="mb-3 text-sm font-medium text-[var(--text-soft)]">Aus vorhandenen Pin-Bildern wählen</p>
               <div className="grid grid-cols-3 gap-2">
                 {pinImages.map(pin => (
-                  <button key={pin.id} onClick={() => { setCoverUrl(pin.image_url ?? ''); setCoverPath(pin.image_path ?? ''); }} className="overflow-hidden rounded-[14px] border border-[var(--line)] bg-white/[0.04] transition hover:border-[var(--accent)]">
+                  <button key={pin.id} onClick={() => { setCoverUrl(pin.image_url ?? ''); setCoverPath(pin.image_path ?? ''); }} className="overflow-hidden rounded-[7px] border border-[var(--line)] bg-white/[0.04] transition hover:border-[var(--accent)]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={pin.image_url ?? ''} alt="" className="h-24 w-full object-cover" />
                   </button>
@@ -135,7 +135,7 @@ export function BoardSettingsPanel({ board, pins, onClose, onBoardSaved }: { boa
             </div>
           )}
 
-          {error && <p className="rounded-[14px] border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
+          {error && <p className="rounded-[7px] border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
         </div>
 
         <footer className="flex items-center justify-end gap-3 border-t border-[var(--line)] p-5">

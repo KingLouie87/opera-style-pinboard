@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import {
   closestCorners,
   DndContext,
+  DragOverlay,
   DragEndEvent,
   DragStartEvent,
   KeyboardSensor,
@@ -21,6 +22,7 @@ import { normalizePositions, nextPosition } from '@/lib/position';
 import { SectionColumn } from './SectionColumn';
 import { PinEditor } from './PinEditor';
 import { BoardSettingsPanel } from './BoardSettingsPanel';
+import { AppShell } from '@/components/platform/AppShell';
 
 type EditorState = null | { section: BoardSection; pin?: Pin | null };
 
@@ -35,7 +37,7 @@ function parseId(id: string) {
   return { type, value };
 }
 
-export function PinboardClient({ board, initialSections, initialPins }: { board: Board; initialSections: BoardSection[]; initialPins: Pin[] }) {
+export function PinboardClient({ board, initialSections, initialPins, userEmail }: { board: Board; initialSections: BoardSection[]; initialPins: Pin[]; userEmail: string }) {
   const [currentBoard, setCurrentBoard] = useState(board);
   const [sections, setSections] = useState(initialSections);
   const [pins, setPins] = useState(initialPins);
@@ -201,70 +203,88 @@ export function PinboardClient({ board, initialSections, initialPins }: { board:
     setEditor(null);
   }
 
+  const activePin = activeId?.startsWith('pin:') ? pins.find(pin => pin.id === activeId.slice(4)) : null;
+
   return (
-    <main className="min-h-screen">
-      <div className="min-h-screen p-4 md:p-6">
-        <header className="glass-strong sticky top-4 z-20 mx-auto mb-5 flex max-w-[1800px] flex-col gap-4 rounded-[22px] p-4 md:flex-row md:items-center md:justify-between">
-          <div className="min-w-0">
-            <Link href="/boards" className="mb-2 inline-flex items-center gap-2 text-sm text-[var(--muted)] hover:text-[var(--accent)]"><ArrowLeft size={16} /> Boards</Link>
-            <h1 className="truncate text-3xl font-semibold tracking-[-0.05em] md:text-4xl">{currentBoard.title}</h1>
-            {currentBoard.description && <p className="mt-1 line-clamp-1 text-sm text-[var(--muted)]">{currentBoard.description}</p>}
+    <AppShell userEmail={userEmail} active="boards" flush>
+      <div className="board-shell flex h-full min-w-0 flex-col">
+        <header className="board-topbar z-20 flex min-h-[74px] shrink-0 flex-col gap-3 px-3 py-3 lg:flex-row lg:items-center lg:justify-between lg:px-5">
+          <div className="flex min-w-0 items-center gap-3">
+            <Link href="/boards" className="btn-ghost hidden h-9 w-9 shrink-0 lg:inline-flex" aria-label="Zurück zu Boards"><ArrowLeft size={17} /></Link>
+            <div className="min-w-0">
+              <div className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                <span>Board</span><span className="h-1 w-1 rounded-full bg-[var(--muted)]" /><span>{sections.length} Bereiche</span><span>{pins.length} Pins</span>
+              </div>
+              <h1 className="truncate text-2xl font-semibold tracking-[-0.055em] md:text-3xl">{currentBoard.title}</h1>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="flex min-w-56 flex-1 items-center gap-2 rounded-[14px] border border-[var(--line)] bg-white/[0.055] px-3 py-2">
-              <Search size={16} className="text-[var(--muted)]" />
-              <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Pins suchen ..." className="w-full bg-transparent text-sm outline-none" />
-            </label>
-            <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} className="rounded-[14px] border border-[var(--line)] bg-white/[0.055] px-3 py-2 text-sm outline-none">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 lg:flex-nowrap lg:justify-end">
+            <label className="search-pill min-w-[15rem] flex-1 lg:w-[360px] lg:flex-none"><Search size={16} /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Pins, Tags, Links suchen ..." /></label>
+            <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} className="field w-auto min-w-[145px] py-2 text-sm">
               <option value="">Alle Status</option>
               {statuses.map(status => <option key={status} value={status}>{status}</option>)}
             </select>
-            <Link href="/notes" className="btn-ghost px-4 py-2 text-sm font-semibold"><BookOpen size={18} /> Notizen</Link>
-            <button onClick={addSection} className="btn-primary px-4 py-2"><Plus size={18} /> Bereich</button>
-            <button onClick={() => setSettingsOpen(true)} className="btn-ghost h-10 w-10" aria-label="Board bearbeiten"><Settings size={18} /></button>
+            <Link href="/notes" className="btn-ghost px-3 py-2 text-sm font-semibold"><BookOpen size={17} /> Notizen</Link>
+            <button onClick={addSection} className="btn-primary px-3 py-2 text-sm"><Plus size={17} /> Bereich</button>
+            <button onClick={() => setSettingsOpen(true)} className="btn-ghost h-9 w-9" aria-label="Board bearbeiten"><Settings size={17} /></button>
           </div>
         </header>
 
+        {currentBoard.description && <div className="hidden shrink-0 border-b border-[var(--line)] bg-black/10 px-5 py-2 text-sm text-[var(--muted)] lg:block">{currentBoard.description}</div>}
+
         {undo && (
-          <div className="mx-auto mb-4 flex max-w-[1800px] items-center justify-between rounded-2xl border border-[var(--line)] bg-black/80 px-4 py-3 text-sm text-white shadow-soft">
+          <div className="mx-3 mt-3 flex shrink-0 items-center justify-between rounded-[8px] border border-[var(--line)] bg-black/70 px-4 py-3 text-sm text-white shadow-soft lg:mx-5">
             <span>{undo.label} vorgemerkt.</span>
-            <button onClick={undoLast} className="inline-flex items-center gap-2 rounded-xl bg-white/15 px-3 py-1.5 hover:bg-white/25"><RotateCcw size={15} /> Rückgängig</button>
+            <button onClick={undoLast} className="inline-flex items-center gap-2 rounded-[7px] bg-white/12 px-3 py-1.5 hover:bg-white/20"><RotateCcw size={15} /> Rückgängig</button>
           </div>
         )}
 
-        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-          <SortableContext items={sections.map(section => `section:${section.id}`)} strategy={horizontalListSortingStrategy}>
-            <div className="board-scroll mx-auto flex max-w-[1800px] gap-4 overflow-x-auto pb-5">
-              {sections.map(section => (
-                <SectionColumn
-                  key={section.id}
-                  section={section}
-                  pins={pinsForSection(section.id)}
-                  onAddPin={section => setEditor({ section })}
-                  onEditPin={pin => setEditor({ section: sections.find(item => item.id === pin.section_id) ?? section, pin })}
-                  onDeletePin={deletePin}
-                  onDuplicatePin={duplicatePin}
-                  onArchivePin={archivePin}
-                  onRenameSection={renameSection}
-                  onDeleteSection={deleteSection}
-                />
-              ))}
+        <section className="board-canvas min-h-0 flex-1 px-3 py-3 lg:px-5 lg:py-4">
+          {sections.length ? (
+            <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+              <SortableContext items={sections.map(section => `section:${section.id}`)} strategy={horizontalListSortingStrategy}>
+                <div className="board-scroll flex h-full min-h-0 w-full gap-3 overflow-x-auto overflow-y-hidden pb-2 pr-2 lg:gap-4">
+                  {sections.map(section => (
+                    <SectionColumn
+                      key={section.id}
+                      section={section}
+                      pins={pinsForSection(section.id)}
+                      onAddPin={section => setEditor({ section })}
+                      onEditPin={pin => setEditor({ section: sections.find(item => item.id === pin.section_id) ?? section, pin })}
+                      onDeletePin={deletePin}
+                      onDuplicatePin={duplicatePin}
+                      onArchivePin={archivePin}
+                      onRenameSection={renameSection}
+                      onDeleteSection={deleteSection}
+                    />
+                  ))}
 
-              <button onClick={addSection} className="grid h-80 w-[22.5rem] shrink-0 place-items-center rounded-[22px] border border-dashed border-[var(--line)] bg-white/[0.035] text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]">
-                <span className="inline-flex items-center gap-2"><Plus size={18} /> Bereich hinzufügen</span>
-              </button>
+                  <button onClick={addSection} className="grid h-full min-h-[24rem] w-[21rem] max-w-[calc(100vw-2rem)] shrink-0 place-items-center rounded-[8px] border border-dashed border-[var(--line)] bg-white/[0.026] text-[var(--muted)] transition hover:border-[var(--accent)] hover:bg-white/[0.045] hover:text-[var(--accent)]">
+                    <span className="inline-flex items-center gap-2"><Plus size={18} /> Bereich hinzufügen</span>
+                  </button>
+                </div>
+              </SortableContext>
+              <DragOverlay>
+                {activePin ? (
+                  <div className="pin-drag-overlay w-[21rem] rounded-[8px] border border-[var(--line-strong)] bg-[rgba(18,20,27,.96)] p-4 backdrop-blur-2xl">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent)]">Verschieben</p>
+                    <h3 className="mt-2 line-clamp-2 text-lg font-semibold tracking-[-0.035em]">{activePin.title || 'Unbenannter Pin'}</h3>
+                    {activePin.description && <p className="mt-2 line-clamp-3 text-sm leading-6 text-[var(--muted)]">{activePin.description}</p>}
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+          ) : (
+            <div className="grid h-full place-items-center rounded-[10px] border border-dashed border-[var(--line)] bg-white/[0.025] p-6">
+              <div className="max-w-xl text-center">
+                <h2 className="text-2xl font-semibold">Starte mit deinem ersten Bereich.</h2>
+                <p className="mt-2 text-[var(--muted)]">Bereiche sind frei sortierbare Zonen, zum Beispiel Recherche, Design, Arbeit oder Später ansehen.</p>
+                <button onClick={addSection} className="btn-primary mt-5 px-5 py-3">Ersten Bereich erstellen</button>
+              </div>
             </div>
-          </SortableContext>
-        </DndContext>
-
-        {!sections.length && (
-          <div className="mx-auto mt-10 max-w-xl rounded-[22px] border border-[var(--line)] bg-white/[0.055] p-8 text-center shadow-soft">
-            <h2 className="text-2xl font-semibold">Starte mit deinem ersten Bereich.</h2>
-            <p className="mt-2 text-[var(--muted)]">Bereiche sind deine frei sortierbaren Zonen, zum Beispiel Recherche, Design, Arbeit oder Später ansehen.</p>
-            <button onClick={addSection} className="btn-primary mt-5 px-5 py-3">Ersten Bereich erstellen</button>
-          </div>
-        )}
+          )}
+        </section>
 
         {editor && (
           <PinEditor
@@ -286,6 +306,6 @@ export function PinboardClient({ board, initialSections, initialPins }: { board:
           />
         )}
       </div>
-    </main>
+    </AppShell>
   );
 }

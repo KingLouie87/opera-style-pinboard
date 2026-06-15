@@ -214,7 +214,7 @@ export function PinEditor({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 p-3 backdrop-blur-md md:p-6" role="dialog" aria-modal="true">
-      <div className="ml-auto flex h-full w-full max-w-3xl flex-col overflow-hidden rounded-[24px] border border-[var(--line-strong)] bg-[var(--panel-strong)] shadow-2xl">
+      <div className="ml-auto flex h-full w-full max-w-3xl flex-col overflow-hidden rounded-[7px] border border-[var(--line-strong)] bg-[var(--panel-strong)] shadow-2xl">
         <header className="flex items-center justify-between border-b border-[var(--line)] p-5">
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.28em] text-[var(--accent)]">{existingPin ? 'Pin bearbeiten' : 'Neuer Pin'}</p>
@@ -224,7 +224,7 @@ export function PinEditor({
         </header>
 
         <form onSubmit={savePin} className="board-scroll flex-1 space-y-5 overflow-y-auto p-5">
-          <section className="rounded-[18px] border border-[var(--line)] bg-white/[0.035] p-4">
+          <section className="rounded-[8px] border border-[var(--line)] bg-white/[0.035] p-4">
             <p className="mb-3 text-sm font-semibold text-[var(--text-soft)]">Link und Website-Bilder</p>
             <div className="grid gap-3 md:grid-cols-[1fr_auto]">
               <input value={draft.url} onChange={event => setField('url', event.target.value)} placeholder="Link optional einfügen" className="field" />
@@ -237,7 +237,7 @@ export function PinEditor({
 
           <div className="grid gap-5 md:grid-cols-[240px_1fr]">
             <aside className="space-y-3">
-              <div className="grid min-h-56 place-items-center overflow-hidden rounded-[18px] border border-dashed border-[var(--line)] bg-white/[0.035]">
+              <div className="grid min-h-56 place-items-center overflow-hidden rounded-[8px] border border-dashed border-[var(--line)] bg-white/[0.035]">
                 {draft.image_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={draft.image_url} alt="Pin Bild" className="h-full min-h-56 w-full object-cover" />
@@ -282,7 +282,7 @@ export function PinEditor({
             </section>
           </div>
 
-          {error && <p className="rounded-[14px] border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
+          {error && <p className="rounded-[7px] border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
 
           <footer className="flex items-center justify-end gap-3 border-t border-[var(--line)] pt-5">
             <button type="button" onClick={onClose} className="btn-ghost px-4 py-3 text-sm font-semibold">Abbrechen</button>

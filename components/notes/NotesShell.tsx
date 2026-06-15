@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, BookOpen, CheckSquare, FilePlus2, Hash, List, ListOrdered, Plus, Quote, Save, Search, Trash2 } from 'lucide-react';
 import { Notebook, NotebookSection, NotePage } from '@/lib/types';
 import { createClient } from '@/lib/supabase/browser';
+import { AppShell } from '@/components/platform/AppShell';
 import { nextPosition } from '@/lib/position';
 
 function nowIso() {
@@ -158,10 +159,11 @@ export function NotesShell({ initialNotebooks, initialSections, initialPages, us
   }
 
   return (
-    <main className="min-h-screen p-4 md:p-6">
-      <header className="glass-strong mx-auto mb-5 flex max-w-[1800px] flex-col gap-4 rounded-[22px] p-4 md:flex-row md:items-center md:justify-between">
+    <AppShell userEmail={userEmail} active="notes">
+      <div className="flex h-full min-h-0 flex-col gap-4">
+      <header className="glass-strong flex shrink-0 flex-col gap-4 rounded-[10px] p-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <Link href="/boards" className="mb-2 inline-flex items-center gap-2 text-sm text-[var(--muted)] hover:text-[var(--accent)]"><ArrowLeft size={16} /> Boards</Link>
+          <Link href="/workspaces" className="mb-2 inline-flex items-center gap-2 text-sm text-[var(--muted)] hover:text-[var(--accent)]"><ArrowLeft size={16} /> Home</Link>
           <h1 className="text-3xl font-semibold tracking-[-0.05em] md:text-4xl">Notizen</h1>
           <p className="mt-1 text-sm text-[var(--muted)]">Arbeitsnotizen, Kapitel und Seiten für {userEmail}</p>
         </div>
@@ -172,14 +174,14 @@ export function NotesShell({ initialNotebooks, initialSections, initialPages, us
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-[1800px] gap-4 lg:grid-cols-[270px_320px_1fr]">
-        <aside className="surface min-h-[72vh] rounded-[22px] p-3">
+      <section className="grid min-h-0 flex-1 gap-3 overflow-hidden lg:grid-cols-[265px_315px_1fr]">
+        <aside className="surface min-h-0 overflow-hidden rounded-[10px] p-3">
           <div className="mb-3 flex items-center justify-between px-2 py-1">
             <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Notizbücher</h2>
           </div>
           <div className="space-y-2">
             {notebooks.map(notebook => (
-              <div key={notebook.id} className={`rounded-[14px] border p-2 ${notebook.id === activeNotebookId ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : 'border-transparent hover:bg-white/[0.055]'}`}>
+              <div key={notebook.id} className={`rounded-[7px] border p-2 ${notebook.id === activeNotebookId ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : 'border-transparent hover:bg-white/[0.055]'}`}>
                 <button onClick={() => setActiveNotebookId(notebook.id)} className="w-full text-left text-sm font-semibold">{notebook.title}</button>
                 {notebook.id === activeNotebookId && (
                   <div className="mt-2 flex gap-1">
@@ -189,13 +191,13 @@ export function NotesShell({ initialNotebooks, initialSections, initialPages, us
                 )}
               </div>
             ))}
-            {!notebooks.length && <button onClick={createNotebook} className="grid min-h-32 w-full place-items-center rounded-[16px] border border-dashed border-[var(--line)] text-sm text-[var(--muted)] hover:border-[var(--accent)]">Erstes Notizbuch erstellen</button>}
+            {!notebooks.length && <button onClick={createNotebook} className="grid min-h-32 w-full place-items-center rounded-[8px] border border-dashed border-[var(--line)] text-sm text-[var(--muted)] hover:border-[var(--accent)]">Erstes Notizbuch erstellen</button>}
           </div>
 
           {!!visibleSections.length && <h3 className="mb-2 mt-6 px-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Kapitel</h3>}
           <div className="space-y-2">
             {visibleSections.map(section => (
-              <div key={section.id} className={`rounded-[14px] border p-2 ${section.id === activeSection?.id ? 'border-white/20 bg-white/[0.07]' : 'border-transparent hover:bg-white/[0.055]'}`}>
+              <div key={section.id} className={`rounded-[7px] border p-2 ${section.id === activeSection?.id ? 'border-white/20 bg-white/[0.07]' : 'border-transparent hover:bg-white/[0.055]'}`}>
                 <button onClick={() => setActiveSectionId(section.id)} className="w-full text-left text-sm">{section.title}</button>
                 {section.id === activeSection?.id && (
                   <div className="mt-2 flex gap-1">
@@ -208,23 +210,23 @@ export function NotesShell({ initialNotebooks, initialSections, initialPages, us
           </div>
         </aside>
 
-        <aside className="surface min-h-[72vh] rounded-[22px] p-3">
-          <label className="mb-3 flex items-center gap-2 rounded-[14px] border border-[var(--line)] bg-white/[0.04] px-3 py-2 text-sm">
+        <aside className="surface min-h-0 overflow-hidden rounded-[10px] p-3">
+          <label className="mb-3 flex items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white/[0.04] px-3 py-2 text-sm">
             <Search size={16} className="text-[var(--muted)]" />
             <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Seiten suchen ..." className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-white/30" />
           </label>
-          <div className="board-scroll max-h-[66vh] space-y-2 overflow-y-auto pr-1">
+          <div className="board-scroll h-full min-h-0 space-y-2 overflow-y-auto pr-1">
             {visiblePages.map(page => (
-              <button key={page.id} onClick={() => setActivePageId(page.id)} className={`block w-full rounded-[16px] border p-3 text-left transition ${page.id === activePage?.id ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : 'border-[var(--line)] bg-white/[0.035] hover:bg-white/[0.06]'}`}>
+              <button key={page.id} onClick={() => setActivePageId(page.id)} className={`block w-full rounded-[8px] border p-3 text-left transition ${page.id === activePage?.id ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : 'border-[var(--line)] bg-white/[0.035] hover:bg-white/[0.06]'}`}>
                 <h3 className="line-clamp-1 text-sm font-semibold">{page.title}</h3>
                 <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--muted)]">{page.content || 'Leere Seite'}</p>
               </button>
             ))}
-            {!visiblePages.length && <button onClick={createPage} className="grid min-h-32 w-full place-items-center rounded-[16px] border border-dashed border-[var(--line)] text-sm text-[var(--muted)] hover:border-[var(--accent)]">Neue Seite erstellen</button>}
+            {!visiblePages.length && <button onClick={createPage} className="grid min-h-32 w-full place-items-center rounded-[8px] border border-dashed border-[var(--line)] text-sm text-[var(--muted)] hover:border-[var(--accent)]">Neue Seite erstellen</button>}
           </div>
         </aside>
 
-        <section className="surface min-h-[72vh] overflow-hidden rounded-[22px]">
+        <section className="surface min-h-0 overflow-hidden rounded-[10px]">
           {activePage ? (
             <div className="flex h-full flex-col">
               <div className="border-b border-[var(--line)] p-4">
@@ -248,11 +250,11 @@ export function NotesShell({ initialNotebooks, initialSections, initialPages, us
                 value={activePage.content}
                 onChange={event => updatePage({ content: event.target.value })}
                 placeholder="Schreibe deine Notizen hier. Nutze die Toolbar für Überschriften, Listen, Checklisten und Zitate."
-                className="note-editor-area board-scroll min-h-[55vh] flex-1 resize-none bg-transparent p-5 text-base leading-8 text-[var(--text-soft)] outline-none placeholder:text-white/25 md:p-7"
+                className="note-editor-area board-scroll min-h-0 flex-1 resize-none bg-transparent p-5 text-base leading-8 text-[var(--text-soft)] outline-none placeholder:text-white/25 md:p-7"
               />
             </div>
           ) : (
-            <div className="grid min-h-[72vh] place-items-center p-8 text-center text-[var(--muted)]">
+            <div className="grid h-full place-items-center p-8 text-center text-[var(--muted)]">
               <div>
                 <BookOpen className="mx-auto mb-4" size={34} />
                 <h2 className="text-xl font-semibold text-white">Noch keine Seite ausgewählt</h2>
@@ -263,6 +265,7 @@ export function NotesShell({ initialNotebooks, initialSections, initialPages, us
           )}
         </section>
       </section>
-    </main>
+    </div>
+    </AppShell>
   );
 }

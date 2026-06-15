@@ -61,14 +61,14 @@ export function LoginForm() {
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 rounded-[14px] border border-[var(--line)] bg-white/[0.045] p-1">
+      <div className="grid grid-cols-2 rounded-[7px] border border-[var(--line)] bg-white/[0.045] p-1">
         <button
           type="button"
           onClick={() => {
             setMode('login');
             setMessage('');
           }}
-          className={`rounded-[10px] px-4 py-2 text-sm font-semibold transition ${
+          className={`rounded-[7px] px-4 py-2 text-sm font-semibold transition ${
             mode === 'login' ? 'bg-white/[0.14] text-white shadow-sm' : 'text-[var(--muted)] hover:text-white'
           }`}
         >
@@ -80,7 +80,7 @@ export function LoginForm() {
             setMode('register');
             setMessage('');
           }}
-          className={`rounded-[10px] px-4 py-2 text-sm font-semibold transition ${
+          className={`rounded-[7px] px-4 py-2 text-sm font-semibold transition ${
             mode === 'register' ? 'bg-white/[0.14] text-white shadow-sm' : 'text-[var(--muted)] hover:text-white'
           }`}
         >
@@ -120,7 +120,7 @@ export function LoginForm() {
           {loading ? (mode === 'login' ? 'Logge ein ...' : 'Erstelle Account ...') : mode === 'login' ? 'Einloggen' : 'Account erstellen'}
         </button>
 
-        {message && <p className="rounded-[14px] border border-[var(--line)] bg-white/[0.055] p-3 text-sm text-[var(--text-soft)]">{message}</p>}
+        {message && <p className="rounded-[7px] border border-[var(--line)] bg-white/[0.055] p-3 text-sm text-[var(--text-soft)]">{message}</p>}
       </form>
     </div>
   );
