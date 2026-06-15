@@ -4,10 +4,12 @@ import Link from 'next/link';
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   closestCorners,
+  pointerWithin,
   DndContext,
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
+  DragOverEvent,
   KeyboardSensor,
   PointerSensor,
   TouchSensor,
@@ -34,6 +36,7 @@ type UndoState = { pins: Pin[]; label: string } | null;
 type DisplayGroup = { id: string | null; title: string; description?: string | null; color?: string | null; collapsed?: boolean; pins: Pin[]; isInbox?: boolean };
 type PinContext = null | { pin: Pin; x: number; y: number };
 type ConfirmState = null | { title: string; message: string; confirmLabel?: string; onConfirm: () => void };
+type CollisionDetectionArgs = Parameters<typeof pointerWithin>[0];
 
 function parseId(id: string) {
   const [type, ...rest] = id.split(':');
@@ -41,7 +44,7 @@ function parseId(id: string) {
 }
 
 function SectionDropButton({ id, label, count, active }: { id: string | null; label: string; count: number; active?: boolean }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `section:${id ?? 'inbox'}` });
+  const { setNodeRef, isOver } = useDroppable({ id: `nav-section:${id ?? 'inbox'}` });
   return (
     <a
       ref={setNodeRef}
@@ -54,12 +57,12 @@ function SectionDropButton({ id, label, count, active }: { id: string | null; la
   );
 }
 
-function BoardSectionPanel({ group, onAdd, onToggle, children }: { group: DisplayGroup; onAdd: (sectionId: string | null) => void; onToggle?: () => void; children: ReactNode }) {
+function BoardSectionPanel({ group, onAdd, onToggle, activeTarget, children }: { group: DisplayGroup; onAdd: (sectionId: string | null) => void; onToggle?: () => void; activeTarget?: boolean; children: ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id: `section:${group.id ?? 'inbox'}` });
   const preview = group.pins.slice(0, 4).filter(pin => pin.image_url);
 
   return (
-    <section id={`section-${group.id ?? 'inbox'}`} ref={setNodeRef} className={`section-panel transition ${isOver ? 'section-panel-over' : ''}`}>
+    <section id={`section-${group.id ?? 'inbox'}`} ref={setNodeRef} className={`section-panel transition ${group.collapsed ? 'section-panel-collapsed' : ''} ${isOver || activeTarget ? 'section-panel-over' : ''}`}>
       <header className="section-header">
         <button type="button" onClick={onToggle} className="flex min-w-0 flex-1 items-center gap-3 text-left" disabled={group.isInbox}>
           {group.isInbox ? <Layers3 size={17} className="text-[var(--accent)]" /> : group.collapsed ? <ChevronRight size={17} /> : <ChevronDown size={17} />}
@@ -74,7 +77,12 @@ function BoardSectionPanel({ group, onAdd, onToggle, children }: { group: Displa
         <button type="button" onClick={() => onAdd(group.id)} className="btn-ghost h-9 px-3 text-sm"><Plus size={15} /> Pin</button>
       </header>
 
-      {!group.collapsed && (
+      {group.collapsed ? (
+        <div className="collapsed-drop-zone" onClick={() => group.id && onToggle?.()}>
+          <span>{activeTarget || isOver ? 'Hier ablegen' : 'Minimierter Teilbereich'}</span>
+          <strong>{group.pins.length}</strong>
+        </div>
+      ) : (
         <div className="section-body">
           {children}
           {!group.pins.length && (
@@ -104,6 +112,7 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
   const [pinContext, setPinContext] = useState<PinContext>(null);
   const [confirm, setConfirm] = useState<ConfirmState>(null);
   const [draggingOver, setDraggingOver] = useState(false);
+  const [overSectionId, setOverSectionId] = useState<string | null | 'inbox'>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
@@ -145,6 +154,23 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
 
   const mediaKinds = useMemo(() => Array.from(new Set(pins.map(pin => pin.media_kind).filter(Boolean))) as string[], [pins]);
   const activePin = activeId?.startsWith('pin:') ? pins.find(pin => pin.id === activeId.slice(4)) : null;
+
+  const collisionDetection = (args: CollisionDetectionArgs) => {
+    const pointerHits = pointerWithin(args);
+    if (pointerHits.length) return pointerHits;
+    return closestCorners(args);
+  };
+
+  function sectionIdFromOverId(overId: string | null | undefined) {
+    if (!overId) return null;
+    const parsed = parseId(String(overId));
+    if (parsed.type === 'section') return parsed.value === 'inbox' ? 'inbox' : parsed.value;
+    if (parsed.type === 'pin') {
+      const pin = pins.find(item => item.id === parsed.value);
+      return pin?.section_id ?? 'inbox';
+    }
+    return null;
+  }
 
   async function addSection() {
     const { data: userData } = await supabase.auth.getUser();
@@ -212,6 +238,11 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
 
   function onDragStart(event: DragStartEvent) {
     setActiveId(String(event.active.id));
+    setOverSectionId(sectionIdFromOverId(String(event.active.id)));
+  }
+
+  function onDragOver(event: DragOverEvent) {
+    setOverSectionId(sectionIdFromOverId(event.over?.id ? String(event.over.id) : null));
   }
 
   function edgeAutoScroll(event: React.DragEvent) {
@@ -226,9 +257,11 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
 
   async function onDragEnd(event: DragEndEvent) {
     setActiveId(null);
-    if (!event.over) return;
+    const fallbackOverSectionId = overSectionId;
+    setOverSectionId(null);
+    if (!event.over && !fallbackOverSectionId) return;
     const active = parseId(String(event.active.id));
-    const over = parseId(String(event.over.id));
+    const over = event.over ? parseId(String(event.over.id)) : { type: 'section', value: fallbackOverSectionId === 'inbox' ? 'inbox' : String(fallbackOverSectionId) };
     if (active.type !== 'pin') return;
     const moving = pins.find(pin => pin.id === active.value);
     if (!moving) return;
@@ -305,7 +338,7 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
           </div>
         </header>
 
-        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd} autoScroll>
+        <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} autoScroll>
           <div
             ref={scrollRef}
             onDragOver={event => { event.preventDefault(); setDraggingOver(true); edgeAutoScroll(event); }}
@@ -316,7 +349,7 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
             <div className={`pointer-events-none absolute inset-4 z-10 grid place-items-center rounded-[10px] border border-dashed border-[var(--accent)] bg-[var(--accent)]/10 text-sm font-semibold text-[var(--text)] backdrop-blur-xl transition ${draggingOver ? 'opacity-100' : 'opacity-0'}`}><UploadCloud size={28} /> Link hier ablegen und als Pin importieren</div>
             <div className="space-y-4">
               {groups.map(group => (
-                <BoardSectionPanel key={group.id ?? 'inbox'} group={group} onAdd={sectionId => setEditor({ sectionId })} onToggle={group.id ? () => toggleSection(group.id!) : undefined}>
+                <BoardSectionPanel key={group.id ?? 'inbox'} group={group} activeTarget={overSectionId === (group.id ?? 'inbox')} onAdd={sectionId => setEditor({ sectionId })} onToggle={group.id ? () => toggleSection(group.id!) : undefined}>
                   <SortableContext items={group.pins.map(pin => `pin:${pin.id}`)} strategy={rectSortingStrategy}>
                     <div className="pin-grid">
                       {group.pins.map(pin => <PinCard key={pin.id} pin={pin} onOpen={setDetailPin} onEdit={pin => setEditor({ sectionId: pin.section_id, pin })} onDelete={requestDeletePin} onDuplicate={duplicatePin} onArchive={archivePin} onPlay={setPlaying} onContext={(pin, point) => setPinContext({ pin, ...point })} />)}
