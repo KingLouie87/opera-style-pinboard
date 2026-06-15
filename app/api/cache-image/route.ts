@@ -1,63 +1,48 @@
 import { NextResponse } from 'next/server';
+import sharp from 'sharp';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
-import { parseHttpUrl, safeFetch } from '@/lib/url-security';
+import { safeFetch } from '@/lib/url-security';
 
 export const runtime = 'nodejs';
 
-const schema = z.object({ imageUrl: z.string().min(4).max(4096) });
-const MAX_IMAGE_SIZE = 6 * 1024 * 1024;
-
-function extensionFromContentType(contentType: string) {
-  if (contentType.includes('png')) return 'png';
-  if (contentType.includes('webp')) return 'webp';
-  if (contentType.includes('gif')) return 'gif';
-  if (contentType.includes('avif')) return 'avif';
-  return 'jpg';
-}
+const schema = z.object({ imageUrl: z.string().url() });
 
 export async function POST(request: Request) {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return NextResponse.json({ error: 'Nicht angemeldet.' }, { status: 401 });
 
-  try {
-    const body = schema.parse(await request.json());
-    const url = parseHttpUrl(body.imageUrl);
-    const response = await safeFetch(url.toString(), { headers: { accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif,*/*;q=0.7' } });
+  const body = schema.parse(await request.json());
+  const response = await safeFetch(body.imageUrl, { headers: { accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif' } });
+  if (!response.ok) return NextResponse.json({ error: 'Bild konnte nicht geladen werden.' }, { status: 400 });
+  const contentType = response.headers.get('content-type') || 'image/jpeg';
+  if (!contentType.startsWith('image/')) return NextResponse.json({ error: 'URL ist kein Bild.' }, { status: 400 });
+  const arrayBuffer = await response.arrayBuffer();
+  if (arrayBuffer.byteLength > 12 * 1024 * 1024) return NextResponse.json({ error: 'Bild ist zu groß.' }, { status: 400 });
 
-    if (!response.ok) return NextResponse.json({ error: `Bild konnte nicht geladen werden (${response.status}).` }, { status: 400 });
+  const input = Buffer.from(arrayBuffer);
+  const meta = await sharp(input).metadata();
+  const resized = sharp(input).rotate().resize({ width: 1600, withoutEnlargement: true });
+  const stats = await resized.clone().resize(1, 1, { fit: 'fill' }).raw().toBuffer();
+  const dominant = `#${[stats[0], stats[1], stats[2]].map(value => value.toString(16).padStart(2, '0')).join('')}`;
+  const webp = await resized.webp({ quality: 82 }).toBuffer();
+  const path = `${userData.user.id}/remote-${crypto.randomUUID()}.webp`;
 
-    const contentType = response.headers.get('content-type') ?? '';
-    if (!contentType.startsWith('image/')) return NextResponse.json({ error: 'Die Datei ist kein Bild.' }, { status: 400 });
+  const { error: uploadError } = await supabase.storage.from('pin-images').upload(path, webp, { contentType: 'image/webp', cacheControl: '31536000' });
+  if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 400 });
 
-    const length = Number(response.headers.get('content-length') || '0');
-    if (length > MAX_IMAGE_SIZE) return NextResponse.json({ error: 'Das Bild ist zu groß. Maximal 6 MB.' }, { status: 400 });
+  await supabase.from('pin_images').insert({
+    user_id: userData.user.id,
+    source_type: 'remote-cache',
+    original_url: body.imageUrl,
+    storage_path: path,
+    mime_type: 'image/webp',
+    size_bytes: webp.byteLength
+  });
 
-    const arrayBuffer = await response.arrayBuffer();
-    if (arrayBuffer.byteLength > MAX_IMAGE_SIZE) return NextResponse.json({ error: 'Das Bild ist zu groß. Maximal 6 MB.' }, { status: 400 });
+  const width = Math.min(meta.width || 1600, 1600);
+  const height = meta.width && meta.height && meta.width > 1600 ? Math.round(meta.height * (1600 / meta.width)) : (meta.height || null);
 
-    const extension = extensionFromContentType(contentType);
-    const path = `${userData.user.id}/${crypto.randomUUID()}.${extension}`;
-    const { error } = await supabase.storage.from('pin-images').upload(path, arrayBuffer, {
-      contentType,
-      upsert: false,
-      cacheControl: '31536000'
-    });
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-
-    await supabase.from('pin_images').insert({
-      user_id: userData.user.id,
-      source_type: 'remote-cache',
-      original_url: url.toString(),
-      storage_path: path,
-      mime_type: contentType,
-      size_bytes: arrayBuffer.byteLength
-    });
-
-    return NextResponse.json({ path, imageUrl: `/api/images/${path}` });
-  } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Bild konnte nicht gespeichert werden.' }, { status: 400 });
-  }
+  return NextResponse.json({ image_url: `/api/images/${path}`, image_path: path, dominant_color: dominant, aspect_ratio: width && height ? width / height : null });
 }

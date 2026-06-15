@@ -1,10 +1,11 @@
 'use client';
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
-import { ImagePlus, Link as LinkIcon, Loader2, Save, X } from 'lucide-react';
-import { BoardSection, LinkPreview, Pin } from '@/lib/types';
+import { FormEvent, useMemo, useState } from 'react';
+import { Eye, FileUp, ImagePlus, Link as LinkIcon, Loader2, Pipette, Sparkles, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/browser';
+import { autoTags, COLOR_PRESETS, inferMediaKind, normalizeOptionalUrl } from '@/lib/media';
 import { nextPosition } from '@/lib/position';
+import { BoardSection, LinkPreview, Pin } from '@/lib/types';
 import { ImagePicker } from './ImagePicker';
 
 type Draft = {
@@ -15,127 +16,133 @@ type Draft = {
   image_path: string;
   notes: string;
   tags: string;
-  status: string;
+  category: string;
+  source: string;
   color: string;
+  dominant_color: string;
+  media_kind: string;
+  content_type: string;
+  file_path: string;
+  file_name: string;
+  file_mime_type: string;
+  file_size_bytes: number | null;
+  aspect_ratio: number | null;
+  section_id: string | null;
 };
 
-
-function normalizeOptionalUrl(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return '';
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  return `https://${trimmed}`;
-}
-
-function pinToDraft(pin?: Pin | null): Draft {
+function fromPin(pin?: Pin | null, initialUrl?: string, targetSectionId?: string | null): Draft {
   return {
     title: pin?.title ?? '',
     description: pin?.description ?? '',
-    url: pin?.url ?? '',
+    url: pin?.url ?? initialUrl ?? '',
     image_url: pin?.image_url ?? '',
     image_path: pin?.image_path ?? '',
     notes: pin?.notes ?? '',
     tags: (pin?.tags ?? []).join(', '),
-    status: pin?.status ?? '',
-    color: pin?.color ?? ''
+    category: pin?.category ?? '',
+    source: pin?.source ?? '',
+    color: pin?.color ?? COLOR_PRESETS[0],
+    dominant_color: pin?.dominant_color ?? '',
+    media_kind: pin?.media_kind ?? 'webpage',
+    content_type: pin?.content_type ?? '',
+    file_path: pin?.file_path ?? '',
+    file_name: pin?.file_name ?? '',
+    file_mime_type: pin?.file_mime_type ?? '',
+    file_size_bytes: pin?.file_size_bytes ?? null,
+    aspect_ratio: pin?.aspect_ratio ?? null,
+    section_id: pin?.section_id ?? targetSectionId ?? null
   };
 }
 
-export function PinEditor({
-  boardId,
-  section,
-  existingPin,
-  existingPins,
-  onClose,
-  onSaved
-}: {
+async function compressImageToWebp(file: File): Promise<{ blob: Blob; width: number; height: number; color: string }> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 1600 / bitmap.width);
+  const width = Math.round(bitmap.width * scale);
+  const height = Math.round(bitmap.height * scale);
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Bild konnte nicht verarbeitet werden.');
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  const sample = ctx.getImageData(Math.floor(width / 2), Math.floor(height / 2), 1, 1).data;
+  const color = `#${[sample[0], sample[1], sample[2]].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(result => result ? resolve(result) : reject(new Error('WebP-Konvertierung fehlgeschlagen.')), 'image/webp', 0.82));
+  return { blob, width, height, color };
+}
+
+export function PinEditor({ boardId, sections, targetSectionId, existingPin, existingPins, initialUrl, onClose, onSaved }: {
   boardId: string;
-  section: BoardSection;
+  sections: BoardSection[];
+  targetSectionId?: string | null;
   existingPin?: Pin | null;
   existingPins: Pin[];
+  initialUrl?: string;
   onClose: () => void;
   onSaved: (pin: Pin) => void;
 }) {
-  const [draft, setDraft] = useState<Draft>(() => pinToDraft(existingPin));
+  const [draft, setDraft] = useState<Draft>(() => fromPin(existingPin, initialUrl, targetSectionId));
   const [preview, setPreview] = useState<LinkPreview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [expert, setExpert] = useState(false);
   const [error, setError] = useState('');
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = createClient();
 
-  useEffect(() => setDraft(pinToDraft(existingPin)), [existingPin]);
+  const tagList = useMemo(() => draft.tags.split(',').map(tag => tag.trim()).filter(Boolean).slice(0, 7), [draft.tags]);
+  const sectionTitle = sections.find(section => section.id === draft.section_id)?.title ?? 'Ohne Bereich';
 
   function setField<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft(current => ({ ...current, [key]: value }));
   }
 
   async function loadPreview() {
-    const url = normalizeOptionalUrl(draft.url);
-    if (!url) {
-      setPreview(null);
-      return;
-    }
+    const normalized = normalizeOptionalUrl(draft.url);
+    if (!normalized) return;
     setLoadingPreview(true);
     setError('');
-    setPreview(null);
     try {
-      const response = await fetch('/api/link-preview', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ url })
-      });
+      const response = await fetch('/api/link-preview', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: normalized }) });
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error ?? 'Preview konnte nicht geladen werden.');
-      setPreview(json);
+      if (!response.ok) throw new Error(json.error || 'Preview fehlgeschlagen.');
+      const data = json as LinkPreview;
+      setPreview(data);
+      const tags = Array.from(new Set([...(tagList.length ? tagList : []), ...data.suggestedTags])).slice(0, 7);
       setDraft(current => ({
         ...current,
-        title: current.title || json.title || '',
-        description: current.description || json.description || ''
+        url: data.url,
+        title: current.title || data.title || '',
+        description: current.description || data.description || '',
+        source: current.source || data.source || '',
+        media_kind: data.mediaKind,
+        content_type: data.contentType || '',
+        tags: tags.length ? tags.join(', ') : autoTags(`${data.title ?? ''} ${data.description ?? ''}`).slice(0, 7).join(', '),
+        image_url: current.image_url || data.images[0] || current.image_url
       }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Preview konnte nicht geladen werden.');
+    } catch (event) {
+      setError(event instanceof Error ? event.message : 'Preview fehlgeschlagen. Der Pin kann trotzdem gespeichert werden.');
     } finally {
       setLoadingPreview(false);
     }
   }
 
   async function chooseRemoteImage(imageUrl: string) {
-    if (!imageUrl) {
-      setDraft(current => ({ ...current, image_url: '', image_path: '' }));
-      return;
-    }
     setUploading(true);
     setError('');
     try {
-      const response = await fetch('/api/cache-image', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ imageUrl })
-      });
+      const response = await fetch('/api/cache-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ imageUrl }) });
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error ?? 'Bild konnte nicht gespeichert werden.');
-      setDraft(current => ({ ...current, image_url: json.imageUrl, image_path: json.path }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Bild konnte nicht gespeichert werden.');
+      if (!response.ok) throw new Error(json.error || 'Bild konnte nicht gespeichert werden.');
+      setDraft(current => ({ ...current, image_url: json.image_url, image_path: json.image_path, dominant_color: json.dominant_color || current.dominant_color, color: current.color || json.dominant_color || current.color, aspect_ratio: json.aspect_ratio || current.aspect_ratio }));
+    } catch (event) {
+      setError(event instanceof Error ? event.message : 'Bild konnte nicht gespeichert werden.');
     } finally {
       setUploading(false);
     }
   }
 
-  async function uploadOwnImage(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setError('Bitte wähle eine Bilddatei aus.');
-      return;
-    }
-    if (file.size > 6 * 1024 * 1024) {
-      setError('Das Bild ist zu groß. Maximal 6 MB.');
-      return;
-    }
-
+  async function uploadFile(file: File) {
     setUploading(true);
     setError('');
     const { data: userData } = await supabase.auth.getUser();
@@ -145,34 +152,42 @@ export function PinEditor({
       return;
     }
 
-    const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-    const path = `${userData.user.id}/${crypto.randomUUID()}.${extension}`;
-    const { error: uploadError } = await supabase.storage.from('pin-images').upload(path, file, {
-      contentType: file.type,
-      upsert: false,
-      cacheControl: '31536000'
-    });
-
-    if (uploadError) {
-      setError(uploadError.message);
-    } else {
-      await supabase.from('pin_images').insert({
-        user_id: userData.user.id,
-        source_type: 'upload',
-        storage_path: path,
-        mime_type: file.type,
-        size_bytes: file.size
-      });
-      setDraft(current => ({ ...current, image_url: `/api/images/${path}`, image_path: path }));
+    try {
+      if (file.type.startsWith('image/')) {
+        const processed = await compressImageToWebp(file);
+        const path = `${userData.user.id}/${crypto.randomUUID()}.webp`;
+        const { error: uploadError } = await supabase.storage.from('pin-images').upload(path, processed.blob, { contentType: 'image/webp', cacheControl: '31536000' });
+        if (uploadError) throw new Error(uploadError.message);
+        await supabase.from('pin_images').insert({ user_id: userData.user.id, source_type: 'upload', storage_path: path, mime_type: 'image/webp', size_bytes: processed.blob.size });
+        setDraft(current => ({ ...current, image_url: `/api/images/${path}`, image_path: path, dominant_color: processed.color, color: current.color || processed.color, media_kind: 'image', aspect_ratio: processed.width / processed.height }));
+      } else {
+        const extension = file.name.split('.').pop()?.toLowerCase() || 'bin';
+        const path = `${userData.user.id}/${crypto.randomUUID()}.${extension}`;
+        const { error: uploadError } = await supabase.storage.from('pin-files').upload(path, file, { contentType: file.type || 'application/octet-stream', cacheControl: '31536000' });
+        if (uploadError) throw new Error(uploadError.message);
+        setDraft(current => ({ ...current, file_path: path, file_name: file.name, file_mime_type: file.type || 'application/octet-stream', file_size_bytes: file.size, media_kind: inferMediaKind(null, file.type, file.name) }));
+      }
+    } catch (event) {
+      setError(event instanceof Error ? event.message : 'Upload fehlgeschlagen.');
+    } finally {
+      setUploading(false);
     }
-    setUploading(false);
+  }
+
+  async function useEyeDropper() {
+    const win = window as Window & { EyeDropper?: new () => { open: () => Promise<{ sRGBHex: string }> } };
+    if (!win.EyeDropper) {
+      setError('Die Pipette wird in diesem Browser nicht unterstützt. Nutze alternativ den HEX-Code.');
+      return;
+    }
+    const result = await new win.EyeDropper().open();
+    setField('color', result.sRGBHex);
   }
 
   async function savePin(event: FormEvent) {
     event.preventDefault();
     setSaving(true);
     setError('');
-
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) {
       setError('Nicht angemeldet.');
@@ -180,28 +195,45 @@ export function PinEditor({
       return;
     }
 
+    const normalizedUrl = normalizeOptionalUrl(draft.url);
+    const hasContent = draft.title.trim() || draft.description.trim() || normalizedUrl || draft.image_url || draft.file_path;
+    if (!hasContent) {
+      setError('Gib mindestens einen Titel, einen Link, ein Bild oder eine Datei an.');
+      setSaving(false);
+      return;
+    }
+
     const payload = {
       board_id: boardId,
-      section_id: section.id,
+      section_id: draft.section_id || null,
       user_id: userData.user.id,
       title: draft.title.trim() || null,
       description: draft.description.trim() || null,
-      url: normalizeOptionalUrl(draft.url) || null,
+      url: normalizedUrl || null,
       image_url: draft.image_url || null,
       image_path: draft.image_path || null,
       notes: draft.notes.trim() || null,
-      tags: draft.tags.split(',').map(tag => tag.trim()).filter(Boolean),
-      status: draft.status.trim() || null,
-      color: draft.color.trim() || null
+      tags: draft.tags.split(',').map(tag => tag.trim()).filter(Boolean).slice(0, 7),
+      category: draft.category.trim() || null,
+      source: draft.source.trim() || null,
+      color: draft.color.trim() || null,
+      dominant_color: draft.dominant_color.trim() || null,
+      media_kind: (draft.media_kind || inferMediaKind(normalizedUrl, draft.file_mime_type, draft.file_name)) as Pin['media_kind'],
+      content_type: draft.content_type.trim() || null,
+      file_path: draft.file_path || null,
+      file_name: draft.file_name || null,
+      file_mime_type: draft.file_mime_type || null,
+      file_size_bytes: draft.file_size_bytes,
+      aspect_ratio: draft.aspect_ratio
     };
 
+    const scopePins = existingPins.filter(pin => (pin.section_id ?? null) === (draft.section_id || null));
     const query = existingPin
       ? supabase.from('pins').update(payload).eq('id', existingPin.id).select('*').single()
-      : supabase.from('pins').insert({ ...payload, position: nextPosition(existingPins.filter(pin => pin.section_id === section.id)) }).select('*').single();
+      : supabase.from('pins').insert({ ...payload, position: nextPosition(scopePins) }).select('*').single();
 
     const { data, error: saveError } = await query;
     setSaving(false);
-
     if (saveError) {
       setError(saveError.message);
       return;
@@ -213,83 +245,62 @@ export function PinEditor({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 p-3 backdrop-blur-md md:p-6" role="dialog" aria-modal="true">
-      <div className="ml-auto flex h-full w-full max-w-3xl flex-col overflow-hidden rounded-[7px] border border-[var(--line-strong)] bg-[var(--panel-strong)] shadow-2xl">
-        <header className="flex items-center justify-between border-b border-[var(--line)] p-5">
+    <div className="fixed inset-0 z-50 bg-black/70 p-3 backdrop-blur-2xl md:p-5" role="dialog" aria-modal="true">
+      <div className="ml-auto flex h-full w-full max-w-5xl flex-col overflow-hidden rounded-[10px] border border-[var(--line-strong)] bg-[var(--panel-strong)] shadow-2xl">
+        <header className="flex items-center justify-between border-b border-[var(--line)] px-5 py-4">
           <div>
-            <p className="font-mono text-xs uppercase tracking-[0.28em] text-[var(--accent)]">{existingPin ? 'Pin bearbeiten' : 'Neuer Pin'}</p>
-            <h2 className="mt-1 text-2xl font-semibold tracking-[-0.04em]">{section.title}</h2>
+            <p className="font-mono text-[10px] uppercase tracking-[0.34em] text-[var(--accent)]">{existingPin ? 'Pin bearbeiten' : 'Pin hinzufügen'}</p>
+            <h2 className="mt-1 text-2xl font-semibold tracking-[-0.05em]">{sectionTitle}</h2>
           </div>
           <button type="button" onClick={onClose} className="btn-ghost h-10 w-10"><X size={18} /></button>
         </header>
 
-        <form onSubmit={savePin} className="board-scroll flex-1 space-y-5 overflow-y-auto p-5">
-          <section className="rounded-[8px] border border-[var(--line)] bg-white/[0.035] p-4">
-            <p className="mb-3 text-sm font-semibold text-[var(--text-soft)]">Link und Website-Bilder</p>
-            <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-              <input value={draft.url} onChange={event => setField('url', event.target.value)} placeholder="Link optional einfügen" className="field" />
-              <button type="button" onClick={loadPreview} disabled={loadingPreview || !draft.url.trim()} className="btn-ghost px-4 py-3 text-sm font-semibold disabled:opacity-50">
-                {loadingPreview ? <Loader2 className="animate-spin" size={18} /> : <LinkIcon size={18} />} Bilder laden
-              </button>
+        <form onSubmit={savePin} className="board-scroll grid flex-1 gap-0 overflow-y-auto lg:grid-cols-[minmax(360px,420px)_1fr]">
+          <aside className="border-b border-[var(--line)] p-4 lg:border-b-0 lg:border-r">
+            <div className="grid min-h-[320px] place-items-center overflow-hidden rounded-[8px] border border-dashed border-[var(--line)] bg-black/22">
+              {draft.image_url ? <img src={draft.image_url} alt="Pin Vorschau" className="h-full min-h-[320px] w-full object-cover" /> : <div className="text-center text-sm text-[var(--muted)]"><ImagePlus className="mx-auto mb-2" /> Kein Cover ausgewählt</div>}
             </div>
-            {preview && <div className="mt-4"><ImagePicker images={preview.images} selected={draft.image_url} onSelect={chooseRemoteImage} disabled={uploading} /></div>}
-          </section>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <label className="btn-ghost cursor-pointer px-3 py-3 text-center text-sm font-semibold">
+                <FileUp size={16} /> {uploading ? 'Upload läuft ...' : 'Datei hochladen'}
+                <input type="file" accept="image/*,video/*,audio/*,.pdf,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx,text/*" className="hidden" onChange={event => event.target.files?.[0] && uploadFile(event.target.files[0])} />
+              </label>
+              <button type="button" onClick={() => setDraft(current => ({ ...current, image_url: '', image_path: '' }))} className="btn-ghost px-3 py-3 text-sm font-semibold">Cover entfernen</button>
+            </div>
 
-          <div className="grid gap-5 md:grid-cols-[240px_1fr]">
-            <aside className="space-y-3">
-              <div className="grid min-h-56 place-items-center overflow-hidden rounded-[8px] border border-dashed border-[var(--line)] bg-white/[0.035]">
-                {draft.image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={draft.image_url} alt="Pin Bild" className="h-full min-h-56 w-full object-cover" />
-                ) : (
-                  <div className="text-center text-sm text-[var(--muted)]"><ImagePlus className="mx-auto mb-2" /> Kein Bild</div>
-                )}
+            <section className="mt-5 space-y-3">
+              <div className="flex items-center justify-between"><p className="text-sm font-semibold text-[var(--text-soft)]">Farbe</p><button type="button" onClick={() => setExpert(!expert)} className="text-xs text-[var(--muted)] hover:text-[var(--text)]">Expertenmodus</button></div>
+              <div className="grid grid-cols-10 gap-1.5">
+                {COLOR_PRESETS.map(color => <button key={color} type="button" onClick={() => setField('color', color)} className={`h-6 rounded-[5px] border ${draft.color === color ? 'border-white' : 'border-white/10'}`} style={{ background: color }} aria-label={color} />)}
               </div>
-              <label className="btn-ghost block cursor-pointer px-4 py-3 text-center text-sm font-semibold">
-                {uploading ? 'Bild wird verarbeitet ...' : 'Eigenes Bild hochladen'}
-                <input type="file" accept="image/*" onChange={uploadOwnImage} className="hidden" />
-              </label>
-              {draft.image_url && <button type="button" onClick={() => setDraft(current => ({ ...current, image_url: '', image_path: '' }))} className="btn-ghost w-full px-4 py-2 text-sm font-semibold text-[var(--danger)]">Bild entfernen</button>}
-            </aside>
-
-            <section className="space-y-4">
-              <label className="block text-sm font-medium text-[var(--text-soft)]">
-                Überschrift
-                <input value={draft.title} onChange={event => setField('title', event.target.value)} placeholder="Kurzer, prägnanter Titel" className="field mt-2 text-lg font-semibold" />
-              </label>
-              <label className="block text-sm font-medium text-[var(--text-soft)]">
-                Beschreibung
-                <textarea value={draft.description} onChange={event => setField('description', event.target.value)} placeholder="Beschreibung oder kurzer Kontext" rows={5} className="field mt-2 resize-none leading-6" />
-              </label>
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="block text-sm font-medium text-[var(--text-soft)]">
-                  Tags
-                  <input value={draft.tags} onChange={event => setField('tags', event.target.value)} placeholder="Design, Recherche, Wichtig" className="field mt-2" />
-                </label>
-                <label className="block text-sm font-medium text-[var(--text-soft)]">
-                  Status
-                  <input value={draft.status} onChange={event => setField('status', event.target.value)} placeholder="Offen, Wichtig, Erledigt" className="field mt-2" />
-                </label>
-              </div>
-              <label className="block text-sm font-medium text-[var(--text-soft)]">
-                Dezente Akzentfarbe
-                <input value={draft.color} onChange={event => setField('color', event.target.value)} placeholder="#7aa7ff oder leer lassen" className="field mt-2" />
-              </label>
-              <label className="block text-sm font-medium text-[var(--text-soft)]">
-                Interne Notiz
-                <textarea value={draft.notes} onChange={event => setField('notes', event.target.value)} placeholder="Nur für dich. Wird auf der Karte gedimmt und kursiv dargestellt." rows={4} className="field mt-2 resize-none italic leading-6" />
-              </label>
+              {expert && <div className="grid grid-cols-[auto_1fr_auto] gap-2"><input type="color" value={draft.color || '#8aa4ff'} onChange={event => setField('color', event.target.value)} className="h-10 w-12 rounded-[6px] border border-[var(--line)] bg-transparent" /><input value={draft.color} onChange={event => setField('color', event.target.value)} className="field" placeholder="#8aa4ff" /><button type="button" onClick={useEyeDropper} className="btn-ghost h-10 w-10"><Pipette size={16} /></button></div>}
             </section>
-          </div>
+          </aside>
 
-          {error && <p className="rounded-[7px] border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
+          <main className="space-y-5 p-4 md:p-5">
+            <section className="rounded-[8px] border border-[var(--line)] bg-white/[0.035] p-4">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--text-soft)]"><LinkIcon size={16} /> Link-Import</div>
+              <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+                <input value={draft.url} onChange={event => setField('url', event.target.value)} placeholder="Link optional einfügen oder aus dem Browser hineinziehen" className="field" />
+                <button type="button" onClick={loadPreview} disabled={loadingPreview || !draft.url.trim()} className="btn-ghost px-4 py-3 text-sm font-semibold disabled:opacity-50">{loadingPreview ? <Loader2 className="animate-spin" size={17} /> : <Sparkles size={17} />} Analysieren</button>
+              </div>
+              {preview && <div className="mt-4"><ImagePicker images={preview.images} selected={draft.image_url} onSelect={chooseRemoteImage} disabled={uploading} /></div>}
+            </section>
 
-          <footer className="flex items-center justify-end gap-3 border-t border-[var(--line)] pt-5">
-            <button type="button" onClick={onClose} className="btn-ghost px-4 py-3 text-sm font-semibold">Abbrechen</button>
-            <button disabled={saving || uploading} className="btn-primary px-5 py-3 disabled:opacity-60">
-              {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />} Speichern
-            </button>
-          </footer>
+            <section className="grid gap-4 md:grid-cols-2">
+              <label className="block text-sm font-medium text-[var(--text-soft)]">Bereich<select value={draft.section_id ?? ''} onChange={event => setField('section_id', event.target.value || null)} className="field mt-2"><option value="">Ohne Bereich / Inbox</option>{sections.map(section => <option key={section.id} value={section.id}>{section.title}</option>)}</select></label>
+              <label className="block text-sm font-medium text-[var(--text-soft)]">Kategorie<input value={draft.category} onChange={event => setField('category', event.target.value)} placeholder="Design, Blender, Hotel ..." className="field mt-2" /></label>
+              <label className="block text-sm font-medium text-[var(--text-soft)] md:col-span-2">Überschrift<input value={draft.title} onChange={event => setField('title', event.target.value)} placeholder="Titel des Pins" className="field mt-2 text-lg font-semibold" /></label>
+              <label className="block text-sm font-medium text-[var(--text-soft)] md:col-span-2">Beschreibung<textarea value={draft.description} onChange={event => setField('description', event.target.value)} placeholder="Kurzer Kontext, warum dieser Pin wichtig ist" className="field mt-2 min-h-28 resize-y" /></label>
+              <label className="block text-sm font-medium text-[var(--text-soft)]">Quelle<input value={draft.source} onChange={event => setField('source', event.target.value)} placeholder="z. B. youtube.com" className="field mt-2" /></label>
+              <label className="block text-sm font-medium text-[var(--text-soft)]">Typ<select value={draft.media_kind} onChange={event => setField('media_kind', event.target.value)} className="field mt-2"><option value="webpage">Webseite</option><option value="image">Bild</option><option value="video">Video</option><option value="pdf">PDF</option><option value="audio">Audio</option><option value="file">Datei</option></select></label>
+              <label className="block text-sm font-medium text-[var(--text-soft)] md:col-span-2">Tags<input value={draft.tags} onChange={event => setField('tags', event.target.value)} placeholder="3 bis 7 Tags, kommagetrennt" className="field mt-2" /><span className="mt-1 block text-xs text-[var(--muted)]">Aktuell: {tagList.length} Tags. Vorschläge werden beim Link-Import automatisch ergänzt.</span></label>
+              <label className="block text-sm font-medium text-[var(--text-soft)] md:col-span-2">Interne Notiz<textarea value={draft.notes} onChange={event => setField('notes', event.target.value)} placeholder="Nur für dich sichtbar, z. B. nächster Schritt oder Kontext" className="field mt-2 min-h-20 resize-y italic" /></label>
+            </section>
+
+            {error && <p className="rounded-[8px] border border-red-400/20 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
+            <footer className="flex justify-end gap-2 border-t border-[var(--line)] pt-4"><button type="button" onClick={onClose} className="btn-ghost px-4 py-3 text-sm font-semibold">Abbrechen</button><button disabled={saving || uploading} className="btn-primary px-5 py-3 text-sm">{saving ? 'Speichern ...' : 'Pin speichern'} <Eye size={16} /></button></footer>
+          </main>
         </form>
       </div>
     </div>

@@ -19,7 +19,7 @@ export async function createClient() {
         try {
           cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
         } catch {
-          // Called from Server Components where cookies cannot always be set.
+          // Server Components may not be allowed to set cookies.
         }
       }
     }

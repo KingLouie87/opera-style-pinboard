@@ -1,6 +1,6 @@
 {
-  "name": "opera-style-pinboard",
-  "version": "0.3.0",
+  "name": "pinboard-focused-premium",
+  "version": "0.5.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -20,7 +20,8 @@
     "next": "16.2.9",
     "react": "latest",
     "react-dom": "latest",
-    "zod": "latest"
+    "zod": "latest",
+    "sharp": "latest"
   },
   "devDependencies": {
     "@types/node": "latest",

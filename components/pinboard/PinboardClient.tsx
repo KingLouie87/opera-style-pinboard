@@ -1,40 +1,86 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   closestCorners,
   DndContext,
-  DragOverlay,
   DragEndEvent,
+  DragOverlay,
   DragStartEvent,
   KeyboardSensor,
   PointerSensor,
   TouchSensor,
+  useDroppable,
   useSensor,
   useSensors
 } from '@dnd-kit/core';
-import { arrayMove, horizontalListSortingStrategy, SortableContext, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { ArrowLeft, BookOpen, Plus, RotateCcw, Search, Settings } from 'lucide-react';
+import { rectSortingStrategy, SortableContext, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { ArrowLeft, ChevronDown, ChevronRight, Filter, Grid2X2, Layers3, LogOut, Moon, Plus, RotateCcw, Search, Settings, Sun, UploadCloud } from 'lucide-react';
 import { Board, BoardSection, Pin } from '@/lib/types';
 import { createClient } from '@/lib/supabase/browser';
-import { normalizePositions, nextPosition } from '@/lib/position';
-import { SectionColumn } from './SectionColumn';
+import { nextPosition, normalizePositions } from '@/lib/position';
+import { PinCard, PinOverlay } from './PinCard';
 import { PinEditor } from './PinEditor';
 import { BoardSettingsPanel } from './BoardSettingsPanel';
-import { AppShell } from '@/components/platform/AppShell';
+import { MobileNav } from './MobileNav';
+import { VideoLightbox } from './VideoLightbox';
 
-type EditorState = null | { section: BoardSection; pin?: Pin | null };
-
-type UndoState = {
-  sections: BoardSection[];
-  pins: Pin[];
-  label: string;
-} | null;
+type EditorState = null | { sectionId?: string | null; pin?: Pin | null; initialUrl?: string };
+type UndoState = { pins: Pin[]; label: string } | null;
+type DisplayGroup = { id: string | null; title: string; description?: string | null; color?: string | null; collapsed?: boolean; pins: Pin[]; isInbox?: boolean };
 
 function parseId(id: string) {
-  const [type, value] = id.split(':');
-  return { type, value };
+  const [type, ...rest] = id.split(':');
+  return { type, value: rest.join(':') };
+}
+
+function SectionDropButton({ id, label, count, active }: { id: string | null; label: string; count: number; active?: boolean }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `section:${id ?? 'inbox'}` });
+  return (
+    <a
+      ref={setNodeRef}
+      href={`#section-${id ?? 'inbox'}`}
+      className={`flex w-full items-center justify-between rounded-[7px] border px-3 py-2 text-left text-sm transition ${isOver || active ? 'border-[var(--accent)] bg-white/[0.09] text-[var(--text)]' : 'border-transparent text-[var(--text-soft)] hover:bg-white/[0.055]'}`}
+    >
+      <span className="truncate">{label}</span>
+      <span className="text-xs text-[var(--muted)]">{count}</span>
+    </a>
+  );
+}
+
+function BoardSectionPanel({ group, onAdd, onToggle, children }: { group: DisplayGroup; onAdd: (sectionId: string | null) => void; onToggle?: () => void; children: ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `section:${group.id ?? 'inbox'}` });
+  const preview = group.pins.slice(0, 4).filter(pin => pin.image_url);
+
+  return (
+    <section id={`section-${group.id ?? 'inbox'}`} ref={setNodeRef} className={`section-panel transition ${isOver ? 'section-panel-over' : ''}`}>
+      <header className="section-header">
+        <button type="button" onClick={onToggle} className="flex min-w-0 flex-1 items-center gap-3 text-left" disabled={group.isInbox}>
+          {group.isInbox ? <Layers3 size={17} className="text-[var(--accent)]" /> : group.collapsed ? <ChevronRight size={17} /> : <ChevronDown size={17} />}
+          <span className="min-w-0">
+            <span className="block truncate text-lg font-semibold tracking-[-0.04em]">{group.title}</span>
+            <span className="mt-0.5 block text-xs text-[var(--muted)]">{group.pins.length} Pins{group.description ? ` · ${group.description}` : ''}</span>
+          </span>
+        </button>
+        <div className="hidden items-center gap-1 md:flex">
+          {group.collapsed && preview.map(pin => <img key={pin.id} src={pin.image_url!} alt="" className="h-8 w-8 rounded-[5px] border border-white/10 object-cover" />)}
+        </div>
+        <button type="button" onClick={() => onAdd(group.id)} className="btn-ghost h-9 px-3 text-sm"><Plus size={15} /> Pin</button>
+      </header>
+
+      {!group.collapsed && (
+        <div className="section-body">
+          {children}
+          {!group.pins.length && (
+            <button type="button" onClick={() => onAdd(group.id)} className="empty-drop-zone">
+              <Plus size={18} /> Pin hinzufügen oder Link hier ablegen
+            </button>
+          )}
+        </div>
+      )}
+    </section>
+  );
 }
 
 export function PinboardClient({ board, initialSections, initialPins, userEmail }: { board: Board; initialSections: BoardSection[]; initialPins: Pin[]; userEmail: string }) {
@@ -42,67 +88,83 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
   const [sections, setSections] = useState(initialSections);
   const [pins, setPins] = useState(initialPins);
   const [editor, setEditor] = useState<EditorState>(null);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [undo, setUndo] = useState<UndoState>(null);
+  const [search, setSearch] = useState('');
+  const [mediaFilter, setMediaFilter] = useState('all');
+  const [sort, setSort] = useState<'position' | 'newest' | 'oldest'>('position');
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [undo, setUndo] = useState<UndoState>(null);
+  const [playing, setPlaying] = useState<Pin | null>(null);
+  const [draggingOver, setDraggingOver] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 7 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 170, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
   const visiblePins = useMemo(() => {
     const q = search.toLowerCase().trim();
-    return pins.filter(pin => {
-      const haystack = [pin.title, pin.description, pin.url, pin.notes, ...(pin.tags ?? [])].filter(Boolean).join(' ').toLowerCase();
+    let result = pins.filter(pin => {
+      const haystack = [pin.title, pin.description, pin.url, pin.source, pin.category, pin.file_name, ...(pin.tags ?? [])].filter(Boolean).join(' ').toLowerCase();
       const matchesSearch = !q || haystack.includes(q);
-      const matchesStatus = !statusFilter || (pin.status ?? '').toLowerCase().includes(statusFilter.toLowerCase());
-      return matchesSearch && matchesStatus;
+      const matchesMedia = mediaFilter === 'all' || pin.media_kind === mediaFilter;
+      return matchesSearch && matchesMedia;
     });
-  }, [pins, search, statusFilter]);
+    result = [...result].sort((a, b) => {
+      if (sort === 'newest') return +new Date(b.created_at) - +new Date(a.created_at);
+      if (sort === 'oldest') return +new Date(a.created_at) - +new Date(b.created_at);
+      return a.position - b.position;
+    });
+    return result;
+  }, [pins, search, mediaFilter, sort]);
 
-  const statuses = useMemo(() => Array.from(new Set(pins.map(pin => pin.status).filter(Boolean))) as string[], [pins]);
+  const groups = useMemo<DisplayGroup[]>(() => {
+    const inboxPins = visiblePins.filter(pin => !pin.section_id);
+    const normalGroups: DisplayGroup[] = sections.map(section => ({
+      id: section.id,
+      title: section.title,
+      description: section.description,
+      color: section.color,
+      collapsed: Boolean(section.is_collapsed),
+      pins: visiblePins.filter(pin => pin.section_id === section.id)
+    }));
+    return [{ id: null, title: 'Schnell gesammelt', description: 'Pins ohne Teilbereich', pins: inboxPins, isInbox: true }, ...normalGroups];
+  }, [sections, visiblePins]);
 
-  function pinsForSection(sectionId: string) {
-    return visiblePins.filter(pin => pin.section_id === sectionId).sort((a, b) => a.position - b.position);
-  }
+  const mediaKinds = useMemo(() => Array.from(new Set(pins.map(pin => pin.media_kind).filter(Boolean))) as string[], [pins]);
+  const activePin = activeId?.startsWith('pin:') ? pins.find(pin => pin.id === activeId.slice(4)) : null;
 
   async function addSection() {
-    const title = `Bereich ${sections.length + 1}`;
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
     const { data } = await supabase
       .from('board_sections')
-      .insert({ board_id: currentBoard.id, user_id: userData.user.id, title, position: nextPosition(sections) })
+      .insert({ board_id: currentBoard.id, user_id: userData.user.id, title: `Bereich ${sections.length + 1}`, position: nextPosition(sections), is_collapsed: false })
       .select('*')
       .single();
     if (data) setSections(current => [...current, data as BoardSection]);
   }
 
-  async function renameSection(section: BoardSection, title: string) {
-    setSections(current => current.map(item => (item.id === section.id ? { ...item, title } : item)));
-    await supabase.from('board_sections').update({ title }).eq('id', section.id);
-  }
-
-  async function deleteSection(section: BoardSection) {
-    if (!confirm(`Bereich "${section.title}" und alle Pins darin löschen?`)) return;
-    setSections(current => current.filter(item => item.id !== section.id));
-    setPins(current => current.filter(pin => pin.section_id !== section.id));
-    await supabase.from('board_sections').delete().eq('id', section.id);
+  async function toggleSection(sectionId: string) {
+    const section = sections.find(item => item.id === sectionId);
+    if (!section) return;
+    const next = !section.is_collapsed;
+    setSections(current => current.map(item => item.id === sectionId ? { ...item, is_collapsed: next } : item));
+    await supabase.from('board_sections').update({ is_collapsed: next }).eq('id', sectionId);
   }
 
   async function deletePin(pin: Pin) {
-    setUndo({ sections, pins, label: 'Pin gelöscht' });
+    setUndo({ pins, label: 'Pin gelöscht' });
     setPins(current => current.filter(item => item.id !== pin.id));
     await supabase.from('pins').update({ deleted_at: new Date().toISOString() }).eq('id', pin.id);
   }
 
   async function archivePin(pin: Pin) {
-    setUndo({ sections, pins, label: 'Pin archiviert' });
+    setUndo({ pins, label: 'Pin archiviert' });
     setPins(current => current.filter(item => item.id !== pin.id));
     await supabase.from('pins').update({ archived_at: new Date().toISOString() }).eq('id', pin.id);
   }
@@ -111,201 +173,149 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
     const { id, created_at, updated_at, ...rest } = pin;
-    const { data } = await supabase
-      .from('pins')
-      .insert({ ...rest, user_id: userData.user.id, title: `${pin.title ?? 'Pin'} Kopie`, position: nextPosition(pins.filter(item => item.section_id === pin.section_id)) })
-      .select('*')
-      .single();
-    if (data) setPins(current => [...current, data as Pin]);
+    const scopePins = pins.filter(item => (item.section_id ?? null) === (pin.section_id ?? null));
+    const { data } = await supabase.from('pins').insert({ ...rest, user_id: userData.user.id, title: `${pin.title ?? 'Pin'} Kopie`, position: nextPosition(scopePins) }).select('*').single();
+    if (data) setPins(current => [data as Pin, ...current]);
   }
 
   async function undoLast() {
     if (!undo) return;
-    const last = undo;
-    setSections(last.sections);
-    setPins(last.pins);
+    const previous = undo.pins;
+    setPins(previous);
     setUndo(null);
+    await Promise.all(previous.map(pin => supabase.from('pins').update({ section_id: pin.section_id, position: pin.position, deleted_at: pin.deleted_at, archived_at: pin.archived_at }).eq('id', pin.id)));
+  }
 
-    await Promise.all(last.sections.map(section =>
-      supabase.from('board_sections').update({ title: section.title, position: section.position }).eq('id', section.id)
-    ));
-
-    await Promise.all(last.pins.map(pin =>
-      supabase.from('pins').update({
-        section_id: pin.section_id,
-        position: pin.position,
-        deleted_at: pin.deleted_at,
-        archived_at: pin.archived_at
-      }).eq('id', pin.id)
-    ));
+  function onSaved(pin: Pin) {
+    setPins(current => current.some(item => item.id === pin.id) ? current.map(item => item.id === pin.id ? pin : item) : [pin, ...current]);
+    setEditor(null);
   }
 
   function onDragStart(event: DragStartEvent) {
     setActiveId(String(event.active.id));
   }
 
+  function edgeAutoScroll(event: React.DragEvent) {
+    const element = scrollRef.current;
+    if (!element) return;
+    const rect = element.getBoundingClientRect();
+    const y = event.clientY - rect.top;
+    const zone = 96;
+    if (y < zone) element.scrollBy({ top: -Math.max(2, (zone - y) / 4), behavior: 'smooth' });
+    if (rect.height - y < zone) element.scrollBy({ top: Math.max(2, (zone - (rect.height - y)) / 4), behavior: 'smooth' });
+  }
+
   async function onDragEnd(event: DragEndEvent) {
     setActiveId(null);
-    const active = parseId(String(event.active.id));
     if (!event.over) return;
-    const overRaw = String(event.over.id);
-    const over = parseId(overRaw);
-
-    setUndo({ sections, pins, label: 'Verschiebung' });
-
-    if (active.type === 'section' && over.type === 'section') {
-      const oldIndex = sections.findIndex(section => section.id === active.value);
-      const newIndex = sections.findIndex(section => section.id === over.value);
-      if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
-      const reordered = normalizePositions(arrayMove(sections, oldIndex, newIndex));
-      setSections(reordered);
-      await Promise.all(reordered.map(section => supabase.from('board_sections').update({ position: section.position }).eq('id', section.id)));
-      return;
-    }
-
+    const active = parseId(String(event.active.id));
+    const over = parseId(String(event.over.id));
     if (active.type !== 'pin') return;
     const moving = pins.find(pin => pin.id === active.value);
     if (!moving) return;
+    setUndo({ pins, label: 'Verschiebung' });
 
-    let targetSectionId = moving.section_id;
-    let targetPinId: string | null = null;
-
-    if (over.type === 'pin') {
-      targetPinId = over.value;
-      targetSectionId = pins.find(pin => pin.id === over.value)?.section_id ?? moving.section_id;
-    }
-    if (over.type === 'section-drop') {
-      targetSectionId = over.value;
-    }
-    if (over.type === 'section') {
-      targetSectionId = over.value;
-    }
+    let targetSectionId: string | null = moving.section_id ?? null;
+    if (over.type === 'section') targetSectionId = over.value === 'inbox' ? null : over.value;
+    if (over.type === 'pin') targetSectionId = pins.find(pin => pin.id === over.value)?.section_id ?? null;
 
     const withoutMoving = pins.filter(pin => pin.id !== moving.id);
-    const targetPins = withoutMoving.filter(pin => pin.section_id === targetSectionId).sort((a, b) => a.position - b.position);
-    const insertIndex = targetPinId ? Math.max(0, targetPins.findIndex(pin => pin.id === targetPinId)) : targetPins.length;
-    const updatedMoving = { ...moving, section_id: targetSectionId };
-    const newTargetPins = [...targetPins.slice(0, insertIndex), updatedMoving, ...targetPins.slice(insertIndex)];
-    const normalizedTargetPins = normalizePositions(newTargetPins);
+    const targetPins = withoutMoving.filter(pin => (pin.section_id ?? null) === targetSectionId).sort((a, b) => a.position - b.position);
+    let insertIndex = targetPins.length;
+    if (over.type === 'pin') {
+      const overIndex = targetPins.findIndex(pin => pin.id === over.value);
+      if (overIndex >= 0) insertIndex = overIndex;
+    }
 
-    const otherPins = withoutMoving.filter(pin => pin.section_id !== targetSectionId);
-    const nextPins = [...otherPins, ...normalizedTargetPins].sort((a, b) => a.position - b.position);
+    const moved = { ...moving, section_id: targetSectionId };
+    const normalized = normalizePositions([...targetPins.slice(0, insertIndex), moved, ...targetPins.slice(insertIndex)]);
+    const nextPins = [...withoutMoving.filter(pin => (pin.section_id ?? null) !== targetSectionId), ...normalized];
     setPins(nextPins);
-
-    await Promise.all(normalizedTargetPins.map(pin => supabase.from('pins').update({ section_id: pin.section_id, position: pin.position }).eq('id', pin.id)));
+    await Promise.all(normalized.map(pin => supabase.from('pins').update({ section_id: pin.section_id, position: pin.position }).eq('id', pin.id)));
   }
 
-  function onSaved(pin: Pin) {
-    setPins(current => {
-      const exists = current.some(item => item.id === pin.id);
-      return exists ? current.map(item => (item.id === pin.id ? pin : item)) : [...current, pin];
-    });
-    setEditor(null);
+  async function signOut() {
+    await supabase.auth.signOut();
+    window.location.href = '/login';
   }
 
-  const activePin = activeId?.startsWith('pin:') ? pins.find(pin => pin.id === activeId.slice(4)) : null;
+  function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', current);
+    localStorage.setItem('pinboard-theme', current);
+  }
+
+  function extractUrlFromDrop(event: React.DragEvent) {
+    const uri = event.dataTransfer.getData('text/uri-list') || event.dataTransfer.getData('text/plain');
+    const match = uri.match(/https?:\/\/[^\s]+/);
+    return match?.[0] || '';
+  }
+
+  function onExternalDrop(event: React.DragEvent, sectionId?: string | null) {
+    event.preventDefault();
+    setDraggingOver(false);
+    const url = extractUrlFromDrop(event);
+    if (url) setEditor({ sectionId: sectionId ?? null, initialUrl: url });
+  }
 
   return (
-    <AppShell userEmail={userEmail} active="boards" flush>
-      <div className="board-shell flex h-full min-w-0 flex-col">
-        <header className="board-topbar z-20 flex min-h-[74px] shrink-0 flex-col gap-3 px-3 py-3 lg:flex-row lg:items-center lg:justify-between lg:px-5">
-          <div className="flex min-w-0 items-center gap-3">
-            <Link href="/boards" className="btn-ghost hidden h-9 w-9 shrink-0 lg:inline-flex" aria-label="Zurück zu Boards"><ArrowLeft size={17} /></Link>
-            <div className="min-w-0">
-              <div className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                <span>Board</span><span className="h-1 w-1 rounded-full bg-[var(--muted)]" /><span>{sections.length} Bereiche</span><span>{pins.length} Pins</span>
-              </div>
-              <h1 className="truncate text-2xl font-semibold tracking-[-0.055em] md:text-3xl">{currentBoard.title}</h1>
-            </div>
-          </div>
+    <main className="app-shell flex h-dvh overflow-hidden">
+      <aside className="hidden w-[292px] shrink-0 border-r border-[var(--line)] bg-black/24 p-3 backdrop-blur-2xl lg:flex lg:flex-col">
+        <Link href="/boards" className="btn-ghost mb-3 h-10 justify-start px-3 text-sm"><ArrowLeft size={16} /> Alle Boards</Link>
+        <div className="mb-4 overflow-hidden rounded-[8px] border border-[var(--line)] bg-white/[0.035]">
+          {currentBoard.cover_url && <img src={currentBoard.cover_url} alt="" className="h-32 w-full object-cover" />}
+          <div className="p-3"><p className="font-mono text-[10px] uppercase tracking-[0.28em] text-[var(--accent)]">Pinboard</p><h1 className="mt-1 line-clamp-2 text-xl font-semibold tracking-[-0.05em]">{currentBoard.title}</h1></div>
+        </div>
+        <div className="space-y-1">
+          {groups.map(group => <SectionDropButton key={group.id ?? 'inbox'} id={group.id} label={group.title} count={group.pins.length} />)}
+        </div>
+        <button onClick={addSection} className="btn-ghost mt-3 px-3 py-2 text-sm"><Plus size={15} /> Teilbereich</button>
+        <div className="mt-auto space-y-2 pt-4"><button onClick={toggleTheme} className="btn-ghost w-full justify-start px-3 py-2 text-sm"><Moon size={15} /><Sun size={15} className="opacity-50" /> Theme</button><button onClick={signOut} className="btn-ghost w-full justify-start px-3 py-2 text-sm"><LogOut size={15} /> {userEmail}</button></div>
+      </aside>
 
-          <div className="flex min-w-0 flex-wrap items-center gap-2 lg:flex-nowrap lg:justify-end">
-            <label className="search-pill min-w-[15rem] flex-1 lg:w-[360px] lg:flex-none"><Search size={16} /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Pins, Tags, Links suchen ..." /></label>
-            <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} className="field w-auto min-w-[145px] py-2 text-sm">
-              <option value="">Alle Status</option>
-              {statuses.map(status => <option key={status} value={status}>{status}</option>)}
-            </select>
-            <Link href="/notes" className="btn-ghost px-3 py-2 text-sm font-semibold"><BookOpen size={17} /> Notizen</Link>
-            <button onClick={addSection} className="btn-primary px-3 py-2 text-sm"><Plus size={17} /> Bereich</button>
-            <button onClick={() => setSettingsOpen(true)} className="btn-ghost h-9 w-9" aria-label="Board bearbeiten"><Settings size={17} /></button>
+      <section className="flex min-w-0 flex-1 flex-col">
+        <header className="z-20 flex min-h-[74px] shrink-0 flex-col gap-3 border-b border-[var(--line)] bg-[var(--bg)]/76 px-3 py-3 backdrop-blur-2xl md:flex-row md:items-center md:justify-between md:px-5">
+          <div className="flex min-w-0 items-center gap-3"><Link href="/boards" className="btn-ghost h-10 w-10 lg:hidden"><ArrowLeft size={17} /></Link><div className="min-w-0"><div className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.28em] text-[var(--muted)]"><Grid2X2 size={13} /> {visiblePins.length} Pins · {sections.length} Bereiche</div><h2 className="truncate text-2xl font-semibold tracking-[-0.055em]">{currentBoard.title}</h2></div></div>
+          <div className="flex min-w-0 flex-wrap items-center gap-2 md:flex-nowrap">
+            <label className="field flex min-w-[220px] flex-1 items-center gap-2 p-0 px-3 md:w-[360px]"><Search size={16} className="text-[var(--muted)]" /><input ref={searchRef} value={search} onChange={event => setSearch(event.target.value)} placeholder="Titel, Tags, URL, Dateien ..." className="h-10 min-w-0 flex-1 bg-transparent outline-none" /></label>
+            <select value={mediaFilter} onChange={event => setMediaFilter(event.target.value)} className="field w-auto py-2"><option value="all">Alle Typen</option>{mediaKinds.map(kind => <option key={kind} value={kind}>{kind}</option>)}</select>
+            <select value={sort} onChange={event => setSort(event.target.value as typeof sort)} className="field w-auto py-2"><option value="position">Manuell</option><option value="newest">Neueste</option><option value="oldest">Älteste</option></select>
+            {undo && <button onClick={undoLast} className="btn-ghost h-10 px-3 text-sm"><RotateCcw size={15} /> Rückgängig</button>}
+            <button onClick={() => setSettingsOpen(true)} className="btn-ghost h-10 w-10"><Settings size={17} /></button>
+            <button onClick={() => setEditor({ sectionId: null })} className="btn-primary h-10 px-4 text-sm"><Plus size={17} /> Pin</button>
           </div>
         </header>
 
-        {currentBoard.description && <div className="hidden shrink-0 border-b border-[var(--line)] bg-black/10 px-5 py-2 text-sm text-[var(--muted)] lg:block">{currentBoard.description}</div>}
-
-        {undo && (
-          <div className="mx-3 mt-3 flex shrink-0 items-center justify-between rounded-[8px] border border-[var(--line)] bg-black/70 px-4 py-3 text-sm text-white shadow-soft lg:mx-5">
-            <span>{undo.label} vorgemerkt.</span>
-            <button onClick={undoLast} className="inline-flex items-center gap-2 rounded-[7px] bg-white/12 px-3 py-1.5 hover:bg-white/20"><RotateCcw size={15} /> Rückgängig</button>
-          </div>
-        )}
-
-        <section className="board-canvas min-h-0 flex-1 px-3 py-3 lg:px-5 lg:py-4">
-          {sections.length ? (
-            <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-              <SortableContext items={sections.map(section => `section:${section.id}`)} strategy={horizontalListSortingStrategy}>
-                <div className="board-scroll flex h-full min-h-0 w-full gap-3 overflow-x-auto overflow-y-hidden pb-2 pr-2 lg:gap-4">
-                  {sections.map(section => (
-                    <SectionColumn
-                      key={section.id}
-                      section={section}
-                      pins={pinsForSection(section.id)}
-                      onAddPin={section => setEditor({ section })}
-                      onEditPin={pin => setEditor({ section: sections.find(item => item.id === pin.section_id) ?? section, pin })}
-                      onDeletePin={deletePin}
-                      onDuplicatePin={duplicatePin}
-                      onArchivePin={archivePin}
-                      onRenameSection={renameSection}
-                      onDeleteSection={deleteSection}
-                    />
-                  ))}
-
-                  <button onClick={addSection} className="grid h-full min-h-[24rem] w-[21rem] max-w-[calc(100vw-2rem)] shrink-0 place-items-center rounded-[8px] border border-dashed border-[var(--line)] bg-white/[0.026] text-[var(--muted)] transition hover:border-[var(--accent)] hover:bg-white/[0.045] hover:text-[var(--accent)]">
-                    <span className="inline-flex items-center gap-2"><Plus size={18} /> Bereich hinzufügen</span>
-                  </button>
-                </div>
-              </SortableContext>
-              <DragOverlay>
-                {activePin ? (
-                  <div className="pin-drag-overlay w-[21rem] rounded-[8px] border border-[var(--line-strong)] bg-[rgba(18,20,27,.96)] p-4 backdrop-blur-2xl">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent)]">Verschieben</p>
-                    <h3 className="mt-2 line-clamp-2 text-lg font-semibold tracking-[-0.035em]">{activePin.title || 'Unbenannter Pin'}</h3>
-                    {activePin.description && <p className="mt-2 line-clamp-3 text-sm leading-6 text-[var(--muted)]">{activePin.description}</p>}
-                  </div>
-                ) : null}
-              </DragOverlay>
-            </DndContext>
-          ) : (
-            <div className="grid h-full place-items-center rounded-[10px] border border-dashed border-[var(--line)] bg-white/[0.025] p-6">
-              <div className="max-w-xl text-center">
-                <h2 className="text-2xl font-semibold">Starte mit deinem ersten Bereich.</h2>
-                <p className="mt-2 text-[var(--muted)]">Bereiche sind frei sortierbare Zonen, zum Beispiel Recherche, Design, Arbeit oder Später ansehen.</p>
-                <button onClick={addSection} className="btn-primary mt-5 px-5 py-3">Ersten Bereich erstellen</button>
-              </div>
+        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd} autoScroll>
+          <div
+            ref={scrollRef}
+            onDragOver={event => { event.preventDefault(); setDraggingOver(true); edgeAutoScroll(event); }}
+            onDragLeave={() => setDraggingOver(false)}
+            onDrop={event => onExternalDrop(event, null)}
+            className="board-scroll relative flex-1 overflow-y-auto px-3 py-4 pb-28 md:px-5 md:pb-6"
+          >
+            <div className={`pointer-events-none absolute inset-4 z-10 grid place-items-center rounded-[10px] border border-dashed border-[var(--accent)] bg-[var(--accent)]/10 text-sm font-semibold text-[var(--text)] backdrop-blur-xl transition ${draggingOver ? 'opacity-100' : 'opacity-0'}`}><UploadCloud size={28} /> Link hier ablegen und als Pin importieren</div>
+            <div className="space-y-4">
+              {groups.map(group => (
+                <BoardSectionPanel key={group.id ?? 'inbox'} group={group} onAdd={sectionId => setEditor({ sectionId })} onToggle={group.id ? () => toggleSection(group.id!) : undefined}>
+                  <SortableContext items={group.pins.map(pin => `pin:${pin.id}`)} strategy={rectSortingStrategy}>
+                    <div className="pin-grid">
+                      {group.pins.map(pin => <PinCard key={pin.id} pin={pin} onEdit={pin => setEditor({ sectionId: pin.section_id, pin })} onDelete={deletePin} onDuplicate={duplicatePin} onArchive={archivePin} onPlay={setPlaying} />)}
+                    </div>
+                  </SortableContext>
+                </BoardSectionPanel>
+              ))}
             </div>
-          )}
-        </section>
+            {!visiblePins.length && <div className="mt-4 grid min-h-[45vh] place-items-center rounded-[10px] border border-dashed border-[var(--line)] text-center"><div><Filter className="mx-auto mb-3 text-[var(--muted)]" /><h3 className="text-xl font-semibold tracking-[-0.04em]">Noch keine Pins sichtbar</h3><p className="mt-2 text-sm text-[var(--muted)]">Füge einen Pin hinzu oder ziehe einen Link aus dem Browser hier hinein.</p></div></div>}
+          </div>
+          <DragOverlay>{activePin ? <PinOverlay pin={activePin} /> : null}</DragOverlay>
+        </DndContext>
+      </section>
 
-        {editor && (
-          <PinEditor
-            boardId={currentBoard.id}
-            section={editor.section}
-            existingPin={editor.pin}
-            existingPins={pins}
-            onClose={() => setEditor(null)}
-            onSaved={onSaved}
-          />
-        )}
-
-        {settingsOpen && (
-          <BoardSettingsPanel
-            board={currentBoard}
-            pins={pins}
-            onClose={() => setSettingsOpen(false)}
-            onBoardSaved={setCurrentBoard}
-          />
-        )}
-      </div>
-    </AppShell>
+      <MobileNav onAdd={() => setEditor({ sectionId: null })} onFocusSearch={() => searchRef.current?.focus()} />
+      {editor && <PinEditor boardId={currentBoard.id} sections={sections} targetSectionId={editor.sectionId ?? null} existingPin={editor.pin} existingPins={pins} initialUrl={editor.initialUrl} onClose={() => setEditor(null)} onSaved={onSaved} />}
+      {settingsOpen && <BoardSettingsPanel board={currentBoard} pins={pins} onClose={() => setSettingsOpen(false)} onSaved={board => { setCurrentBoard(board); setSettingsOpen(false); }} />}
+      <VideoLightbox pin={playing} onClose={() => setPlaying(null)} />
+    </main>
   );
 }

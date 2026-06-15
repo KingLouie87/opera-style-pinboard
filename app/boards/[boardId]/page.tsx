@@ -1,39 +1,18 @@
 import { notFound, redirect } from 'next/navigation';
-import { PinboardClient } from '@/components/pinboard/PinboardClient';
 import { createClient } from '@/lib/supabase/server';
+import { PinboardClient } from '@/components/pinboard/PinboardClient';
 
 export default async function BoardPage({ params }: { params: Promise<{ boardId: string }> }) {
   const { boardId } = await params;
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
-  const user = userData.user;
+  if (!userData.user) redirect('/login');
 
-  if (!user) redirect('/login');
-
-  const { data: board } = await supabase
-    .from('boards')
-    .select('*')
-    .eq('id', boardId)
-    .eq('user_id', user.id)
-    .single();
-
+  const [{ data: board }, { data: sections }, { data: pins }] = await Promise.all([
+    supabase.from('boards').select('*').eq('id', boardId).eq('user_id', userData.user.id).single(),
+    supabase.from('board_sections').select('*').eq('board_id', boardId).eq('user_id', userData.user.id).order('position'),
+    supabase.from('pins').select('*').eq('board_id', boardId).eq('user_id', userData.user.id).is('deleted_at', null).is('archived_at', null).order('position')
+  ]);
   if (!board) notFound();
-
-  const { data: sections } = await supabase
-    .from('board_sections')
-    .select('*')
-    .eq('board_id', boardId)
-    .eq('user_id', user.id)
-    .order('position', { ascending: true });
-
-  const { data: pins } = await supabase
-    .from('pins')
-    .select('*')
-    .eq('board_id', boardId)
-    .eq('user_id', user.id)
-    .is('deleted_at', null)
-    .is('archived_at', null)
-    .order('position', { ascending: true });
-
-  return <PinboardClient board={board} initialSections={sections ?? []} initialPins={pins ?? []} userEmail={user.email ?? ''} />;
+  return <PinboardClient board={board} initialSections={sections ?? []} initialPins={pins ?? []} userEmail={userData.user.email ?? 'Account'} />;
 }

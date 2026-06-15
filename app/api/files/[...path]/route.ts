@@ -8,7 +8,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pat
   const resolved = await params;
   const storagePath = resolved.path.join('/');
   if (!storagePath.startsWith(`${userData.user.id}/`)) return NextResponse.json({ error: 'Nicht erlaubt.' }, { status: 403 });
-  const { data, error } = await supabase.storage.from('pin-images').download(storagePath);
-  if (error || !data) return NextResponse.json({ error: 'Bild nicht gefunden.' }, { status: 404 });
-  return new NextResponse(data, { headers: { 'content-type': data.type || 'image/webp', 'cache-control': 'private, max-age=86400' } });
+  const { data, error } = await supabase.storage.from('pin-files').download(storagePath);
+  if (error || !data) return NextResponse.json({ error: 'Datei nicht gefunden.' }, { status: 404 });
+  return new NextResponse(data, { headers: { 'content-type': data.type || 'application/octet-stream', 'cache-control': 'private, max-age=3600' } });
 }

@@ -3,6 +3,7 @@ import * as cheerio from 'cheerio';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { parseHttpUrl, safeFetch } from '@/lib/url-security';
+import { autoTags, inferMediaKind, youtubeEmbed } from '@/lib/media';
 
 export const runtime = 'nodejs';
 
@@ -16,7 +17,7 @@ function checkRateLimit(userId: string) {
     rate.set(userId, { count: 1, reset: now + 60_000 });
     return true;
   }
-  if (current.count >= 50) return false;
+  if (current.count >= 60) return false;
   current.count += 1;
   return true;
 }
@@ -37,20 +38,21 @@ function absoluteUrl(value: string | undefined | null, base: URL) {
 
 function srcsetUrls(value: string | undefined | null) {
   if (!value) return [];
-  return value
-    .split(',')
-    .map(part => part.trim().split(/\s+/)[0])
-    .filter(Boolean);
+  return value.split(',').map(part => part.trim().split(/\s+/)[0]).filter(Boolean);
 }
 
-function looksLikeUsefulImage(url: string, width?: string, height?: string) {
+function looksUseful(url: string, width?: string, height?: string) {
   const lower = url.toLowerCase();
-  if (lower.includes('tracking') || lower.includes('pixel') || lower.includes('spacer') || lower.includes('blank.gif')) return false;
-  if (lower.endsWith('.svg') || lower.includes('logo') || lower.includes('favicon')) return false;
+  if (lower.includes('tracking') || lower.includes('pixel') || lower.includes('spacer') || lower.includes('blank')) return false;
+  if (lower.includes('sprite') || lower.includes('favicon') || lower.endsWith('.svg')) return false;
   const w = Number(width || 0);
   const h = Number(height || 0);
-  if ((w && w < 90) || (h && h < 90)) return false;
+  if ((w && w < 120) || (h && h < 90)) return false;
   return true;
+}
+
+function sourceName(url: URL) {
+  return url.hostname.replace(/^www\./, '');
 }
 
 export async function POST(request: Request) {
@@ -63,31 +65,34 @@ export async function POST(request: Request) {
     const body = schema.parse(await request.json());
     const target = parseHttpUrl(body.url);
     const response = await safeFetch(target.toString());
-
     if (!response.ok) return NextResponse.json({ error: `Website konnte nicht geladen werden (${response.status}).` }, { status: 400 });
 
     const contentType = response.headers.get('content-type') ?? '';
+    const mediaKindFromHeader = inferMediaKind(target.toString(), contentType, null);
     if (!contentType.includes('text/html') && !contentType.includes('application/xhtml')) {
-      return NextResponse.json({ error: 'Die URL liefert kein HTML-Dokument.' }, { status: 400 });
+      return NextResponse.json({
+        url: target.toString(),
+        title: decodeURIComponent(target.pathname.split('/').pop() || sourceName(target)),
+        description: null,
+        favicon: absoluteUrl('/favicon.ico', target),
+        source: sourceName(target),
+        mediaKind: mediaKindFromHeader,
+        contentType,
+        suggestedTags: autoTags(`${sourceName(target)} ${target.pathname}`).slice(0, 7),
+        images: [],
+        videoEmbedUrl: youtubeEmbed(target.toString())
+      });
     }
 
     const html = await response.text();
     const $ = cheerio.load(html);
-    const title =
-      $('meta[property="og:title"]').attr('content') ||
-      $('meta[name="twitter:title"]').attr('content') ||
-      $('title').first().text() ||
-      null;
-    const description =
-      $('meta[property="og:description"]').attr('content') ||
-      $('meta[name="description"]').attr('content') ||
-      $('meta[name="twitter:description"]').attr('content') ||
-      null;
-
-    const imageCandidates: string[] = [];
+    const title = $('meta[property="og:title"]').attr('content') || $('meta[name="twitter:title"]').attr('content') || $('title').first().text() || null;
+    const description = $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || $('meta[name="twitter:description"]').attr('content') || null;
+    const ogType = $('meta[property="og:type"]').attr('content') || '';
+    const images: string[] = [];
     const push = (value: string | undefined | null, width?: string, height?: string) => {
       const absolute = absoluteUrl(value, target);
-      if (absolute && looksLikeUsefulImage(absolute, width, height) && !imageCandidates.includes(absolute)) imageCandidates.push(absolute);
+      if (absolute && looksUseful(absolute, width, height) && !images.includes(absolute)) images.push(absolute);
     };
 
     push($('meta[property="og:image:secure_url"]').attr('content'), $('meta[property="og:image:width"]').attr('content'), $('meta[property="og:image:height"]').attr('content'));
@@ -106,23 +111,23 @@ export async function POST(request: Request) {
       for (const src of srcsetUrls(img.attr('srcset'))) push(src, width, height);
       for (const src of srcsetUrls(img.attr('data-srcset'))) push(src, width, height);
     });
+    $('source').each((_, element) => srcsetUrls($(element).attr('srcset')).forEach(src => push(src)));
 
-    $('source').each((_, element) => {
-      for (const src of srcsetUrls($(element).attr('srcset'))) push(src);
-    });
-
-    const favicon =
-      absoluteUrl($('link[rel="apple-touch-icon"]').attr('href'), target) ||
-      absoluteUrl($('link[rel="icon"]').attr('href'), target) ||
-      absoluteUrl($('link[rel="shortcut icon"]').attr('href'), target) ||
-      absoluteUrl('/favicon.ico', target);
+    const favicon = absoluteUrl($('link[rel="apple-touch-icon"]').attr('href'), target) || absoluteUrl($('link[rel="icon"]').attr('href'), target) || absoluteUrl($('link[rel="shortcut icon"]').attr('href'), target) || absoluteUrl('/favicon.ico', target);
+    const mediaKind = youtubeEmbed(target.toString()) || ogType.includes('video') ? 'video' : inferMediaKind(target.toString(), contentType, null);
+    const suggestedTags = autoTags(`${title ?? ''} ${description ?? ''} ${sourceName(target)} ${target.pathname}`).slice(0, 7);
 
     return NextResponse.json({
       url: target.toString(),
       title: title?.trim() || null,
       description: description?.trim() || null,
       favicon,
-      images: imageCandidates.slice(0, 48)
+      source: sourceName(target),
+      mediaKind,
+      contentType,
+      suggestedTags,
+      images: images.slice(0, 60),
+      videoEmbedUrl: youtubeEmbed(target.toString())
     });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Preview fehlgeschlagen.' }, { status: 400 });
