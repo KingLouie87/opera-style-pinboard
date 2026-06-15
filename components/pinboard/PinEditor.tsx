@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from 'react';
 import { Eye, FileUp, ImagePlus, Link as LinkIcon, Loader2, Pipette, Sparkles, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/browser';
 import { autoTags, COLOR_PRESETS, inferMediaKind, normalizeOptionalUrl } from '@/lib/media';
+import { sanitizeTags } from '@/lib/tags';
 import { nextPosition } from '@/lib/position';
 import { BoardSection, LinkPreview, Pin } from '@/lib/types';
 import { ImagePicker } from './ImagePicker';
@@ -90,7 +91,7 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
   const [error, setError] = useState('');
   const supabase = createClient();
 
-  const tagList = useMemo(() => draft.tags.split(',').map(tag => tag.trim()).filter(Boolean).slice(0, 7), [draft.tags]);
+  const tagList = useMemo(() => sanitizeTags(draft.tags), [draft.tags]);
   const sectionTitle = sections.find(section => section.id === draft.section_id)?.title ?? 'Ohne Bereich';
 
   function setField<K extends keyof Draft>(key: K, value: Draft[K]) {
@@ -108,7 +109,7 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
       if (!response.ok) throw new Error(json.error || 'Preview fehlgeschlagen.');
       const data = json as LinkPreview;
       setPreview(data);
-      const tags = Array.from(new Set([...(tagList.length ? tagList : []), ...data.suggestedTags])).slice(0, 7);
+      const tags = sanitizeTags([...(tagList.length ? tagList : []), ...data.suggestedTags]);
       setDraft(current => ({
         ...current,
         url: data.url,
@@ -117,7 +118,7 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
         source: current.source || data.source || '',
         media_kind: data.mediaKind,
         content_type: data.contentType || '',
-        tags: tags.length ? tags.join(', ') : autoTags(`${data.title ?? ''} ${data.description ?? ''}`).slice(0, 7).join(', '),
+        tags: tags.length ? tags.join(', ') : sanitizeTags(autoTags(`${data.title ?? ''} ${data.description ?? ''}`)).join(', '),
         image_url: current.image_url || data.images[0] || current.image_url
       }));
     } catch (event) {
@@ -213,7 +214,7 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
       image_url: draft.image_url || null,
       image_path: draft.image_path || null,
       notes: draft.notes.trim() || null,
-      tags: draft.tags.split(',').map(tag => tag.trim()).filter(Boolean).slice(0, 7),
+      tags: sanitizeTags(draft.tags),
       category: draft.category.trim() || null,
       source: draft.source.trim() || null,
       color: draft.color.trim() || null,
@@ -245,8 +246,8 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 p-3 backdrop-blur-2xl md:p-5" role="dialog" aria-modal="true">
-      <div className="ml-auto flex h-full w-full max-w-5xl flex-col overflow-hidden rounded-[10px] border border-[var(--line-strong)] bg-[var(--panel-strong)] shadow-2xl">
+    <div className="modal-backdrop z-50 p-3 md:p-5" role="dialog" aria-modal="true">
+      <div className="mx-auto my-auto flex max-h-[92dvh] w-full max-w-5xl flex-col overflow-hidden rounded-[10px] border border-[var(--line-strong)] bg-[var(--panel-strong)] shadow-2xl">
         <header className="flex items-center justify-between border-b border-[var(--line)] px-5 py-4">
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.34em] text-[var(--accent)]">{existingPin ? 'Pin bearbeiten' : 'Pin hinzufügen'}</p>
@@ -288,12 +289,12 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
             </section>
 
             <section className="grid gap-4 md:grid-cols-2">
-              <label className="block text-sm font-medium text-[var(--text-soft)]">Bereich<select value={draft.section_id ?? ''} onChange={event => setField('section_id', event.target.value || null)} className="field mt-2"><option value="">Ohne Bereich / Inbox</option>{sections.map(section => <option key={section.id} value={section.id}>{section.title}</option>)}</select></label>
+              <label className="block text-sm font-medium text-[var(--text-soft)]">Bereich<select value={draft.section_id ?? ''} onChange={event => setField('section_id', event.target.value || null)} className="field app-select mt-2"><option value="">Ohne Bereich / Inbox</option>{sections.map(section => <option key={section.id} value={section.id}>{section.title}</option>)}</select></label>
               <label className="block text-sm font-medium text-[var(--text-soft)]">Kategorie<input value={draft.category} onChange={event => setField('category', event.target.value)} placeholder="Design, Blender, Hotel ..." className="field mt-2" /></label>
               <label className="block text-sm font-medium text-[var(--text-soft)] md:col-span-2">Überschrift<input value={draft.title} onChange={event => setField('title', event.target.value)} placeholder="Titel des Pins" className="field mt-2 text-lg font-semibold" /></label>
               <label className="block text-sm font-medium text-[var(--text-soft)] md:col-span-2">Beschreibung<textarea value={draft.description} onChange={event => setField('description', event.target.value)} placeholder="Kurzer Kontext, warum dieser Pin wichtig ist" className="field mt-2 min-h-28 resize-y" /></label>
               <label className="block text-sm font-medium text-[var(--text-soft)]">Quelle<input value={draft.source} onChange={event => setField('source', event.target.value)} placeholder="z. B. youtube.com" className="field mt-2" /></label>
-              <label className="block text-sm font-medium text-[var(--text-soft)]">Typ<select value={draft.media_kind} onChange={event => setField('media_kind', event.target.value)} className="field mt-2"><option value="webpage">Webseite</option><option value="image">Bild</option><option value="video">Video</option><option value="pdf">PDF</option><option value="audio">Audio</option><option value="file">Datei</option></select></label>
+              <label className="block text-sm font-medium text-[var(--text-soft)]">Typ<select value={draft.media_kind} onChange={event => setField('media_kind', event.target.value)} className="field app-select mt-2"><option value="webpage">Webseite</option><option value="image">Bild</option><option value="video">Video</option><option value="pdf">PDF</option><option value="audio">Audio</option><option value="file">Datei</option></select></label>
               <label className="block text-sm font-medium text-[var(--text-soft)] md:col-span-2">Tags<input value={draft.tags} onChange={event => setField('tags', event.target.value)} placeholder="3 bis 7 Tags, kommagetrennt" className="field mt-2" /><span className="mt-1 block text-xs text-[var(--muted)]">Aktuell: {tagList.length} Tags. Vorschläge werden beim Link-Import automatisch ergänzt.</span></label>
               <label className="block text-sm font-medium text-[var(--text-soft)] md:col-span-2">Interne Notiz<textarea value={draft.notes} onChange={event => setField('notes', event.target.value)} placeholder="Nur für dich sichtbar, z. B. nächster Schritt oder Kontext" className="field mt-2 min-h-20 resize-y italic" /></label>
             </section>

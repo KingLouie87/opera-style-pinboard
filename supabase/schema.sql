@@ -10,6 +10,8 @@ create table if not exists public.boards (
   description text,
   cover_url text,
   cover_path text,
+  archived_at timestamptz,
+  deleted_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -72,6 +74,7 @@ create table if not exists public.pin_images (
 );
 
 create index if not exists boards_user_idx on public.boards(user_id, updated_at desc);
+create index if not exists boards_archive_idx on public.boards(user_id, archived_at) where deleted_at is null;
 create index if not exists board_sections_board_idx on public.board_sections(board_id, position);
 create index if not exists pins_section_idx on public.pins(section_id, position) where deleted_at is null;
 create index if not exists pins_board_idx on public.pins(board_id, position) where deleted_at is null;

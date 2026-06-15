@@ -5,6 +5,8 @@ export type Board = {
   description: string | null;
   cover_url: string | null;
   cover_path: string | null;
+  archived_at: string | null;
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
 };

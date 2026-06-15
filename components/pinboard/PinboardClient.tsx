@@ -25,10 +25,15 @@ import { PinEditor } from './PinEditor';
 import { BoardSettingsPanel } from './BoardSettingsPanel';
 import { MobileNav } from './MobileNav';
 import { VideoLightbox } from './VideoLightbox';
+import { ContextMenu, pinMenuIcons } from './ContextMenu';
+import { ConfirmDialog } from './ConfirmDialog';
+import { PinDetailModal } from './PinDetailModal';
 
 type EditorState = null | { sectionId?: string | null; pin?: Pin | null; initialUrl?: string };
 type UndoState = { pins: Pin[]; label: string } | null;
 type DisplayGroup = { id: string | null; title: string; description?: string | null; color?: string | null; collapsed?: boolean; pins: Pin[]; isInbox?: boolean };
+type PinContext = null | { pin: Pin; x: number; y: number };
+type ConfirmState = null | { title: string; message: string; confirmLabel?: string; onConfirm: () => void };
 
 function parseId(id: string) {
   const [type, ...rest] = id.split(':');
@@ -95,14 +100,17 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [undo, setUndo] = useState<UndoState>(null);
   const [playing, setPlaying] = useState<Pin | null>(null);
+  const [detailPin, setDetailPin] = useState<Pin | null>(null);
+  const [pinContext, setPinContext] = useState<PinContext>(null);
+  const [confirm, setConfirm] = useState<ConfirmState>(null);
   const [draggingOver, setDraggingOver] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 170, tolerance: 8 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 10 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 190, tolerance: 9 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
@@ -112,7 +120,7 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
       const haystack = [pin.title, pin.description, pin.url, pin.source, pin.category, pin.file_name, ...(pin.tags ?? [])].filter(Boolean).join(' ').toLowerCase();
       const matchesSearch = !q || haystack.includes(q);
       const matchesMedia = mediaFilter === 'all' || pin.media_kind === mediaFilter;
-      return matchesSearch && matchesMedia;
+      return matchesSearch && matchesMedia && !pin.archived_at && !pin.deleted_at;
     });
     result = [...result].sort((a, b) => {
       if (sort === 'newest') return +new Date(b.created_at) - +new Date(a.created_at);
@@ -157,7 +165,17 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
     await supabase.from('board_sections').update({ is_collapsed: next }).eq('id', sectionId);
   }
 
+  function requestDeletePin(pin: Pin) {
+    setConfirm({
+      title: 'Pin wirklich löschen?',
+      message: 'Der Pin wird aus dem aktiven Board entfernt. Diese Aktion kann nur über die Datenbank rückgängig gemacht werden.',
+      confirmLabel: 'Pin löschen',
+      onConfirm: () => deletePin(pin)
+    });
+  }
+
   async function deletePin(pin: Pin) {
+    setConfirm(null);
     setUndo({ pins, label: 'Pin gelöscht' });
     setPins(current => current.filter(item => item.id !== pin.id));
     await supabase.from('pins').update({ deleted_at: new Date().toISOString() }).eq('id', pin.id);
@@ -174,7 +192,7 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
     if (!userData.user) return;
     const { id, created_at, updated_at, ...rest } = pin;
     const scopePins = pins.filter(item => (item.section_id ?? null) === (pin.section_id ?? null));
-    const { data } = await supabase.from('pins').insert({ ...rest, user_id: userData.user.id, title: `${pin.title ?? 'Pin'} Kopie`, position: nextPosition(scopePins) }).select('*').single();
+    const { data } = await supabase.from('pins').insert({ ...rest, user_id: userData.user.id, title: `${pin.title ?? 'Pin'} Kopie`, position: nextPosition(scopePins), archived_at: null, deleted_at: null }).select('*').single();
     if (data) setPins(current => [data as Pin, ...current]);
   }
 
@@ -189,6 +207,7 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
   function onSaved(pin: Pin) {
     setPins(current => current.some(item => item.id === pin.id) ? current.map(item => item.id === pin.id ? pin : item) : [pin, ...current]);
     setEditor(null);
+    if (detailPin?.id === pin.id) setDetailPin(pin);
   }
 
   function onDragStart(event: DragStartEvent) {
@@ -300,7 +319,7 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
                 <BoardSectionPanel key={group.id ?? 'inbox'} group={group} onAdd={sectionId => setEditor({ sectionId })} onToggle={group.id ? () => toggleSection(group.id!) : undefined}>
                   <SortableContext items={group.pins.map(pin => `pin:${pin.id}`)} strategy={rectSortingStrategy}>
                     <div className="pin-grid">
-                      {group.pins.map(pin => <PinCard key={pin.id} pin={pin} onEdit={pin => setEditor({ sectionId: pin.section_id, pin })} onDelete={deletePin} onDuplicate={duplicatePin} onArchive={archivePin} onPlay={setPlaying} />)}
+                      {group.pins.map(pin => <PinCard key={pin.id} pin={pin} onOpen={setDetailPin} onEdit={pin => setEditor({ sectionId: pin.section_id, pin })} onDelete={requestDeletePin} onDuplicate={duplicatePin} onArchive={archivePin} onPlay={setPlaying} onContext={(pin, point) => setPinContext({ pin, ...point })} />)}
                     </div>
                   </SortableContext>
                 </BoardSectionPanel>
@@ -308,13 +327,23 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
             </div>
             {!visiblePins.length && <div className="mt-4 grid min-h-[45vh] place-items-center rounded-[10px] border border-dashed border-[var(--line)] text-center"><div><Filter className="mx-auto mb-3 text-[var(--muted)]" /><h3 className="text-xl font-semibold tracking-[-0.04em]">Noch keine Pins sichtbar</h3><p className="mt-2 text-sm text-[var(--muted)]">Füge einen Pin hinzu oder ziehe einen Link aus dem Browser hier hinein.</p></div></div>}
           </div>
-          <DragOverlay>{activePin ? <PinOverlay pin={activePin} /> : null}</DragOverlay>
+          <DragOverlay dropAnimation={{ duration: 230, easing: 'cubic-bezier(.2,.8,.2,1)' }}>{activePin ? <PinOverlay pin={activePin} /> : null}</DragOverlay>
         </DndContext>
       </section>
 
       <MobileNav onAdd={() => setEditor({ sectionId: null })} onFocusSearch={() => searchRef.current?.focus()} />
+      {pinContext && <ContextMenu x={pinContext.x} y={pinContext.y} onClose={() => setPinContext(null)} items={[
+        { label: 'Öffnen', icon: pinMenuIcons.ExternalLink, onSelect: () => setDetailPin(pinContext.pin) },
+        { label: 'Bearbeiten', icon: pinMenuIcons.Pencil, onSelect: () => setEditor({ sectionId: pinContext.pin.section_id, pin: pinContext.pin }) },
+        { label: 'Verschieben', icon: pinMenuIcons.FolderInput, onSelect: () => setEditor({ sectionId: pinContext.pin.section_id, pin: pinContext.pin }) },
+        { label: 'Duplizieren', icon: pinMenuIcons.Copy, onSelect: () => duplicatePin(pinContext.pin) },
+        { label: 'Archivieren', icon: pinMenuIcons.Archive, onSelect: () => archivePin(pinContext.pin) },
+        { label: 'Löschen', icon: pinMenuIcons.Trash2, danger: true, onSelect: () => requestDeletePin(pinContext.pin) }
+      ]} />}
       {editor && <PinEditor boardId={currentBoard.id} sections={sections} targetSectionId={editor.sectionId ?? null} existingPin={editor.pin} existingPins={pins} initialUrl={editor.initialUrl} onClose={() => setEditor(null)} onSaved={onSaved} />}
       {settingsOpen && <BoardSettingsPanel board={currentBoard} pins={pins} onClose={() => setSettingsOpen(false)} onSaved={board => { setCurrentBoard(board); setSettingsOpen(false); }} />}
+      {detailPin && <PinDetailModal pin={detailPin} onClose={() => setDetailPin(null)} onEdit={pin => setEditor({ sectionId: pin.section_id, pin })} onPlay={setPlaying} />}
+      {confirm && <ConfirmDialog title={confirm.title} message={confirm.message} confirmLabel={confirm.confirmLabel} onCancel={() => setConfirm(null)} onConfirm={confirm.onConfirm} />}
       <VideoLightbox pin={playing} onClose={() => setPlaying(null)} />
     </main>
   );

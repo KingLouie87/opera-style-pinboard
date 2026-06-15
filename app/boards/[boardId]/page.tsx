@@ -9,7 +9,7 @@ export default async function BoardPage({ params }: { params: Promise<{ boardId:
   if (!userData.user) redirect('/login');
 
   const [{ data: board }, { data: sections }, { data: pins }] = await Promise.all([
-    supabase.from('boards').select('*').eq('id', boardId).eq('user_id', userData.user.id).single(),
+    supabase.from('boards').select('*').eq('id', boardId).eq('user_id', userData.user.id).is('archived_at', null).is('deleted_at', null).single(),
     supabase.from('board_sections').select('*').eq('board_id', boardId).eq('user_id', userData.user.id).order('position'),
     supabase.from('pins').select('*').eq('board_id', boardId).eq('user_id', userData.user.id).is('deleted_at', null).is('archived_at', null).order('position')
   ]);
