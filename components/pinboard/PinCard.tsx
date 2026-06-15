@@ -44,7 +44,10 @@ export function PinVisual({ pin, floating = false }: { pin: Pin; floating?: bool
       className={`pin-visual ${floating ? 'pin-floating' : ''}`}
       style={{ '--pin-accent': accent } as React.CSSProperties}
     >
-      <div className={`pin-cover ${pin.image_url ? '' : 'pin-cover-empty'}`} style={{ aspectRatio: pin.aspect_ratio ? `${Math.max(0.72, Math.min(Number(pin.aspect_ratio), 1.35))}` : '4 / 5' }}>
+      <div
+        className={`pin-cover ${pin.image_url ? '' : 'pin-cover-empty'}`}
+        style={{ aspectRatio: pin.aspect_ratio ? `${Math.max(0.72, Math.min(Number(pin.aspect_ratio), 0.92))}` : '3 / 4' }}
+      >
         {pin.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={pin.image_url} alt="" className="pin-cover-img" draggable={false} />
@@ -77,7 +80,7 @@ export function PinVisual({ pin, floating = false }: { pin: Pin; floating?: bool
 
 export function PinOverlay({ pin }: { pin: Pin }) {
   return (
-    <div className="pointer-events-none w-[252px] animate-[pin-float_.16s_ease-out]">
+    <div className="pointer-events-none w-[264px] max-w-[72vw] animate-[pin-float_.18s_cubic-bezier(.2,.8,.2,1)]">
       <PinVisual pin={pin} floating />
     </div>
   );

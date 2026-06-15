@@ -4,12 +4,14 @@ import Link from 'next/link';
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   closestCorners,
+  rectIntersection,
   pointerWithin,
   DndContext,
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
   DragOverEvent,
+  type CollisionDetection,
   KeyboardSensor,
   PointerSensor,
   TouchSensor,
@@ -36,7 +38,6 @@ type UndoState = { pins: Pin[]; label: string } | null;
 type DisplayGroup = { id: string | null; title: string; description?: string | null; color?: string | null; collapsed?: boolean; pins: Pin[]; isInbox?: boolean };
 type PinContext = null | { pin: Pin; x: number; y: number };
 type ConfirmState = null | { title: string; message: string; confirmLabel?: string; onConfirm: () => void };
-type CollisionDetectionArgs = Parameters<typeof pointerWithin>[0];
 
 function parseId(id: string) {
   const [type, ...rest] = id.split(':');
@@ -155,8 +156,20 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
   const mediaKinds = useMemo(() => Array.from(new Set(pins.map(pin => pin.media_kind).filter(Boolean))) as string[], [pins]);
   const activePin = activeId?.startsWith('pin:') ? pins.find(pin => pin.id === activeId.slice(4)) : null;
 
-  const collisionDetection = (args: CollisionDetectionArgs) => {
+  const collisionDetection: CollisionDetection = (args) => {
+    const isSectionHit = (id: unknown) => {
+      const value = String(id);
+      return value.startsWith('section:') || value.startsWith('nav-section:');
+    };
+
     const pointerHits = pointerWithin(args);
+    const pointerSectionHits = pointerHits.filter(hit => isSectionHit(hit.id));
+    if (pointerSectionHits.length) return pointerSectionHits;
+
+    const rectHits = rectIntersection(args);
+    const rectSectionHits = rectHits.filter(hit => isSectionHit(hit.id));
+    if (rectSectionHits.length) return rectSectionHits;
+
     if (pointerHits.length) return pointerHits;
     return closestCorners(args);
   };
@@ -164,7 +177,7 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
   function sectionIdFromOverId(overId: string | null | undefined) {
     if (!overId) return null;
     const parsed = parseId(String(overId));
-    if (parsed.type === 'section') return parsed.value === 'inbox' ? 'inbox' : parsed.value;
+    if (parsed.type === 'section' || parsed.type === 'nav-section') return parsed.value === 'inbox' ? 'inbox' : parsed.value;
     if (parsed.type === 'pin') {
       const pin = pins.find(item => item.id === parsed.value);
       return pin?.section_id ?? 'inbox';
@@ -268,7 +281,7 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
     setUndo({ pins, label: 'Verschiebung' });
 
     let targetSectionId: string | null = moving.section_id ?? null;
-    if (over.type === 'section') targetSectionId = over.value === 'inbox' ? null : over.value;
+    if (over.type === 'section' || over.type === 'nav-section') targetSectionId = over.value === 'inbox' ? null : over.value;
     if (over.type === 'pin') targetSectionId = pins.find(pin => pin.id === over.value)?.section_id ?? null;
 
     const withoutMoving = pins.filter(pin => pin.id !== moving.id);
