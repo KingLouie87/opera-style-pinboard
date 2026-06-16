@@ -7,6 +7,7 @@ type Item = {
   label: string;
   icon: LucideIcon;
   danger?: boolean;
+  disabled?: boolean;
   onSelect: () => void;
 };
 
@@ -36,7 +37,7 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
       {items.map(item => {
         const Icon = item.icon;
         return (
-          <button key={item.label} type="button" onClick={() => { item.onSelect(); onClose(); }} className={item.danger ? 'danger' : ''} role="menuitem">
+          <button key={item.label} type="button" disabled={item.disabled} onClick={() => { if (item.disabled) return; item.onSelect(); onClose(); }} className={item.danger ? 'danger' : ''} role="menuitem">
             <Icon size={15} />
             <span>{item.label}</span>
           </button>
@@ -46,4 +47,17 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
   );
 }
 
-export const pinMenuIcons = { ExternalLink, Pencil, FolderInput, Copy, Archive, Trash2 };
+export const pinMenuIcons = {
+  open: ExternalLink,
+  edit: Pencil,
+  move: FolderInput,
+  duplicate: Copy,
+  archive: Archive,
+  delete: Trash2,
+  ExternalLink,
+  Pencil,
+  FolderInput,
+  Copy,
+  Archive,
+  Trash2
+};

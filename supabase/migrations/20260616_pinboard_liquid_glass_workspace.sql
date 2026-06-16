@@ -23,3 +23,12 @@ where workspace_type is null;
 create index if not exists boards_workspace_idx
   on public.boards(user_id, workspace_type, updated_at desc)
   where deleted_at is null;
+
+-- Board dashboard grouping and ordering, inspired by Opera Pinboard sections
+alter table public.boards
+  add column if not exists board_group text,
+  add column if not exists board_position integer not null default 0;
+
+create index if not exists boards_group_order_idx
+  on public.boards(user_id, workspace_type, board_group, board_position, updated_at desc)
+  where deleted_at is null;

@@ -8,6 +8,8 @@ export type Board = {
   cover_url: string | null;
   cover_path: string | null;
   workspace_type: WorkspaceType | null;
+  board_group: string | null;
+  board_position: number | null;
   archived_at: string | null;
   deleted_at: string | null;
   created_at: string;

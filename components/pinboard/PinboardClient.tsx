@@ -20,7 +20,7 @@ import {
   useSensors
 } from '@dnd-kit/core';
 import { rectSortingStrategy, SortableContext, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Edit3, Filter, Grid2X2, Layers3, LogOut, Moon, Plus, RotateCcw, Search, Settings, Sun, UploadCloud, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, ChevronRight, Filter, Grid2X2, Layers3, List, ListTree, LogOut, Moon, Plus, RotateCcw, Search, Settings, SlidersHorizontal, Sun, Trash2, UploadCloud, X } from 'lucide-react';
 import { Board, BoardSection, Pin } from '@/lib/types';
 import { createClient } from '@/lib/supabase/browser';
 import { nextPosition, normalizePositions } from '@/lib/position';
@@ -34,35 +34,43 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { PinDetailModal } from './PinDetailModal';
 
 type EditorState = null | { sectionId?: string | null; pin?: Pin | null; initialUrl?: string };
-type UndoState = { pins: Pin[]; label: string } | null;
+type UndoState = { pins: Pin[]; sections?: BoardSection[]; label: string } | null;
 type DisplayGroup = { id: string | null; title: string; description?: string | null; color?: string | null; collapsed?: boolean; pins: Pin[]; isInbox?: boolean };
 type PinContext = null | { pin: Pin; x: number; y: number };
+type SectionContext = null | { group: DisplayGroup; x: number; y: number };
 type ConfirmState = null | { title: string; message: string; confirmLabel?: string; onConfirm: () => void };
+type ViewMode = 'detailed' | 'standard' | 'compact';
 
 function parseId(id: string) {
   const [type, ...rest] = id.split(':');
   return { type, value: rest.join(':') };
 }
 
-function SectionDropButton({ id, label, count, active }: { id: string | null; label: string; count: number; active?: boolean }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `nav-section:${id ?? 'inbox'}` });
+function SectionNavItem({ group, active, onContext }: { group: DisplayGroup; active?: boolean; onContext: (group: DisplayGroup, point: { x: number; y: number }) => void }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `nav-section:${group.id ?? 'inbox'}` });
   return (
     <a
       ref={setNodeRef}
-      href={`#section-${id ?? 'inbox'}`}
+      href={`#section-${group.id ?? 'inbox'}`}
+      onContextMenu={event => { event.preventDefault(); onContext(group, { x: event.clientX, y: event.clientY }); }}
       className={`section-nav-pill ${isOver || active ? 'section-nav-pill-active' : ''}`}
     >
-      <span className="truncate">{label}</span>
-      <span>{count}</span>
+      <span className="truncate">{group.title}</span>
+      <span>{group.pins.length}</span>
     </a>
   );
 }
 
-function BoardSectionPanel({ group, onAdd, onToggle, onRename, activeTarget, children }: {
+function ViewModeButton({ active, icon, label, onClick }: { active: boolean; icon: ReactNode; label: string; onClick: () => void }) {
+  return <button type="button" onClick={onClick} className={`view-mode-button ${active ? 'active' : ''}`}>{icon}<span>{label}</span></button>;
+}
+
+function BoardSectionPanel({ group, onAdd, onToggle, onRename, onContext, activeTarget, children }: {
   group: DisplayGroup;
   onAdd: (sectionId: string | null) => void;
   onToggle?: () => void;
   onRename?: (sectionId: string, title: string) => void;
+  onContext: (group: DisplayGroup, point: { x: number; y: number }) => void;
   activeTarget?: boolean;
   children: ReactNode;
 }) {
@@ -83,8 +91,14 @@ function BoardSectionPanel({ group, onAdd, onToggle, onRename, activeTarget, chi
     setEditing(false);
   }
 
+  function openOptions(event: React.MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    onContext(group, { x: event.clientX, y: event.clientY });
+  }
+
   return (
-    <section id={`section-${group.id ?? 'inbox'}`} ref={setNodeRef} className={`section-panel transition ${group.collapsed ? 'section-panel-collapsed' : ''} ${isDropTarget ? 'section-panel-over' : ''}`}>
+    <section id={`section-${group.id ?? 'inbox'}`} ref={setNodeRef} onContextMenu={openOptions} className={`section-panel transition ${group.collapsed ? 'section-panel-collapsed' : ''} ${isDropTarget ? 'section-panel-over' : ''}`}>
       <header className="section-header">
         <button type="button" onClick={onToggle} className="section-title-button" disabled={group.isInbox || editing}>
           {group.isInbox ? <Layers3 size={17} className="text-[var(--accent)]" /> : group.collapsed ? <ChevronRight size={17} /> : <ChevronDown size={17} />}
@@ -111,15 +125,15 @@ function BoardSectionPanel({ group, onAdd, onToggle, onRename, activeTarget, chi
 
         {editing ? (
           <div className="section-edit-actions">
-            <button type="button" onClick={submitRename} className="section-icon-button" aria-label="Namen speichern"><Check size={15} /></button>
+            <button type="button" onClick={submitRename} className="section-icon-button" aria-label="Namen speichern">OK</button>
             <button type="button" onClick={cancelRename} className="section-icon-button" aria-label="Umbenennen abbrechen"><X size={15} /></button>
           </div>
         ) : (
           <>
             <div className="hidden items-center gap-1 md:flex">
-              {group.collapsed && preview.map(pin => <img key={pin.id} src={pin.image_url!} alt="" className="h-8 w-8 rounded-[9px] border border-white/10 object-cover" />)}
+              {group.collapsed && preview.map(pin => <img key={pin.id} src={pin.image_url!} alt="" className="h-8 w-8 rounded-[5px] border border-white/10 object-cover" />)}
             </div>
-            {!group.isInbox && <button type="button" onClick={() => { setDraft(group.title); setEditing(true); }} className="section-icon-button section-rename-button" aria-label="Teilbereich umbenennen"><Edit3 size={15} /></button>}
+            {!group.isInbox && <button type="button" onClick={openOptions} className="section-icon-button section-options-button" aria-label="Teilbereich Optionen"><Settings size={15} /></button>}
             <button type="button" onClick={() => onAdd(group.id)} className="btn-ghost h-9 px-3 text-sm"><Plus size={15} /> Pin</button>
           </>
         )}
@@ -153,11 +167,14 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
   const [search, setSearch] = useState('');
   const [mediaFilter, setMediaFilter] = useState('all');
   const [sort, setSort] = useState<'position' | 'newest' | 'oldest'>('position');
+  const [viewMode, setViewMode] = useState<ViewMode>('standard');
+  const [sectionFilter, setSectionFilter] = useState<string>('all');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [undo, setUndo] = useState<UndoState>(null);
   const [playing, setPlaying] = useState<Pin | null>(null);
   const [detailPin, setDetailPin] = useState<Pin | null>(null);
   const [pinContext, setPinContext] = useState<PinContext>(null);
+  const [sectionContext, setSectionContext] = useState<SectionContext>(null);
   const [confirm, setConfirm] = useState<ConfirmState>(null);
   const [draggingOver, setDraggingOver] = useState(false);
   const [overSectionId, setOverSectionId] = useState<string | null | 'inbox'>(null);
@@ -189,34 +206,36 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
 
   const groups = useMemo<DisplayGroup[]>(() => {
     const inboxPins = visiblePins.filter(pin => !pin.section_id);
-    const normalGroups: DisplayGroup[] = sections.map(section => ({
-      id: section.id,
-      title: section.title,
-      description: section.description,
-      color: section.color,
-      collapsed: Boolean(section.is_collapsed),
-      pins: visiblePins.filter(pin => pin.section_id === section.id)
-    }));
-    return [{ id: null, title: 'Schnell gesammelt', description: 'Pins ohne Teilbereich', pins: inboxPins, isInbox: true }, ...normalGroups];
+    const normalGroups: DisplayGroup[] = sections
+      .slice()
+      .sort((a, b) => a.position - b.position)
+      .map(section => ({
+        id: section.id,
+        title: section.title,
+        description: section.description,
+        color: section.color,
+        collapsed: Boolean(section.is_collapsed),
+        pins: visiblePins.filter(pin => pin.section_id === section.id)
+      }));
+    return [{ id: null, title: 'Ohne Teilbereich', description: 'Pins ohne Teilbereich', pins: inboxPins, isInbox: true }, ...normalGroups];
   }, [sections, visiblePins]);
 
+  const detailedPins = useMemo(() => sectionFilter === 'all' ? visiblePins : visiblePins.filter(pin => (pin.section_id ?? 'inbox') === sectionFilter), [visiblePins, sectionFilter]);
   const mediaKinds = useMemo(() => Array.from(new Set(pins.map(pin => pin.media_kind).filter(Boolean))) as string[], [pins]);
   const activePin = activeId?.startsWith('pin:') ? pins.find(pin => pin.id === activeId.slice(4)) : null;
+  const sectionById = useMemo(() => new Map(sections.map(section => [section.id, section])), [sections]);
 
   const collisionDetection: CollisionDetection = (args) => {
     const isSectionHit = (id: unknown) => {
       const value = String(id);
       return value.startsWith('section:') || value.startsWith('nav-section:');
     };
-
     const pointerHits = pointerWithin(args);
     const pointerSectionHits = pointerHits.filter(hit => isSectionHit(hit.id));
     if (pointerSectionHits.length) return pointerSectionHits;
-
     const rectHits = rectIntersection(args);
     const rectSectionHits = rectHits.filter(hit => isSectionHit(hit.id));
     if (rectSectionHits.length) return rectSectionHits;
-
     if (pointerHits.length) return pointerHits;
     return closestCorners(args);
   };
@@ -248,6 +267,12 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
     await supabase.from('board_sections').update({ title }).eq('id', sectionId);
   }
 
+  function requestRenameSection(group: DisplayGroup) {
+    if (!group.id) return;
+    const title = window.prompt('Teilbereich umbenennen', group.title)?.trim();
+    if (title) renameSection(group.id, title);
+  }
+
   async function toggleSection(sectionId: string) {
     const section = sections.find(item => item.id === sectionId);
     if (!section) return;
@@ -256,10 +281,46 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
     await supabase.from('board_sections').update({ is_collapsed: next }).eq('id', sectionId);
   }
 
+  async function moveSection(sectionId: string, direction: -1 | 1) {
+    const ordered = sections.slice().sort((a, b) => a.position - b.position);
+    const index = ordered.findIndex(section => section.id === sectionId);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= ordered.length) return;
+    [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
+    const normalized = ordered.map((section, position) => ({ ...section, position }));
+    setSections(normalized);
+    await Promise.all(normalized.map(section => supabase.from('board_sections').update({ position: section.position }).eq('id', section.id)));
+  }
+
+  async function sortSectionsAlphabetically() {
+    const normalized = sections.slice().sort((a, b) => a.title.localeCompare(b.title, 'de')).map((section, position) => ({ ...section, position }));
+    setSections(normalized);
+    await Promise.all(normalized.map(section => supabase.from('board_sections').update({ position: section.position }).eq('id', section.id)));
+  }
+
+  function requestDeleteSection(group: DisplayGroup) {
+    if (!group.id) return;
+    setConfirm({
+      title: 'Teilbereich löschen?',
+      message: `„${group.title}“ wird gelöscht. Die enthaltenen Pins werden nicht gelöscht, sondern in „Ohne Teilbereich“ verschoben.`,
+      confirmLabel: 'Teilbereich löschen',
+      onConfirm: () => deleteSection(group.id!)
+    });
+  }
+
+  async function deleteSection(sectionId: string) {
+    setConfirm(null);
+    setUndo({ pins, sections, label: 'Teilbereich gelöscht' });
+    setPins(current => current.map(pin => pin.section_id === sectionId ? { ...pin, section_id: null } : pin));
+    setSections(current => current.filter(section => section.id !== sectionId));
+    await supabase.from('pins').update({ section_id: null }).eq('section_id', sectionId);
+    await supabase.from('board_sections').delete().eq('id', sectionId);
+  }
+
   function requestDeletePin(pin: Pin) {
     setConfirm({
       title: 'Pin wirklich löschen?',
-      message: 'Der Pin wird aus dem aktiven Board entfernt. Diese Aktion kann nur über die Datenbank rückgängig gemacht werden.',
+      message: 'Der Pin wird aus dem aktiven Board entfernt. Diese Aktion kann über das Archiv nicht mehr sichtbar gemacht werden.',
       confirmLabel: 'Pin löschen',
       onConfirm: () => deletePin(pin)
     });
@@ -289,10 +350,11 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
 
   async function undoLast() {
     if (!undo) return;
-    const previous = undo.pins;
-    setPins(previous);
+    const previousPins = undo.pins;
+    setPins(previousPins);
+    if (undo.sections) setSections(undo.sections);
     setUndo(null);
-    await Promise.all(previous.map(pin => supabase.from('pins').update({ section_id: pin.section_id, position: pin.position, deleted_at: pin.deleted_at, archived_at: pin.archived_at }).eq('id', pin.id)));
+    await Promise.all(previousPins.map(pin => supabase.from('pins').update({ section_id: pin.section_id, position: pin.position, deleted_at: pin.deleted_at, archived_at: pin.archived_at }).eq('id', pin.id)));
   }
 
   function onSaved(pin: Pin) {
@@ -375,11 +437,23 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
     if (url) setEditor({ sectionId: sectionId ?? null, initialUrl: url });
   }
 
+  function sectionTitleForPin(pin: Pin) {
+    return pin.section_id ? sectionById.get(pin.section_id)?.title ?? 'Teilbereich' : 'Ohne Teilbereich';
+  }
+
+  function renderPin(pin: Pin, mode: ViewMode) {
+    return <PinCard key={pin.id} pin={pin} mode={mode === 'compact' ? 'compact' : mode === 'detailed' ? 'detailed' : 'standard'} sectionTitle={sectionTitleForPin(pin)} onOpen={setDetailPin} onPlay={setPlaying} onContext={(item, point) => setPinContext({ pin: item, ...point })} />;
+  }
+
+  function openSectionContext(group: DisplayGroup, point: { x: number; y: number }) {
+    setSectionContext({ group, ...point });
+  }
+
   return (
-    <main className="app-shell award-grid-bg flex h-dvh overflow-hidden">
+    <main className="app-shell flex h-dvh overflow-hidden">
       <aside className="hidden w-[286px] shrink-0 p-4 lg:flex lg:flex-col">
         <div className="side-glass flex min-h-0 flex-1 flex-col">
-          <Link href="/boards" className="btn-ghost mb-3 h-10 justify-start px-3 text-sm"><ArrowLeft size={16} /> Alle Boards</Link>
+          <Link href="/boards" className="top-back-link mb-3"><ArrowLeft size={16} /> Alle Boards</Link>
           <div className="board-side-cover">
             {currentBoard.cover_url && <img src={currentBoard.cover_url} alt="" />}
             <div>
@@ -388,9 +462,12 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
             </div>
           </div>
           <div className="section-nav-list">
-            {groups.map(group => <SectionDropButton key={group.id ?? 'inbox'} id={group.id} label={group.title} count={group.pins.length} active={overSectionId === (group.id ?? 'inbox')} />)}
+            {groups.map(group => <SectionNavItem key={group.id ?? 'inbox'} group={group} active={overSectionId === (group.id ?? 'inbox')} onContext={openSectionContext} />)}
           </div>
-          <button onClick={addSection} className="btn-ghost mt-3 px-3 py-2 text-sm"><Plus size={15} /> Teilbereich</button>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button onClick={addSection} className="btn-ghost px-3 py-2 text-sm"><Plus size={15} /> Bereich</button>
+            <button onClick={sortSectionsAlphabetically} className="btn-ghost px-3 py-2 text-sm">A-Z</button>
+          </div>
           <div className="mt-auto space-y-2 pt-4"><button onClick={toggleTheme} className="btn-ghost w-full justify-start px-3 py-2 text-sm"><Moon size={15} /><Sun size={15} className="opacity-50" /> Theme</button><button onClick={signOut} className="btn-ghost w-full justify-start px-3 py-2 text-sm"><LogOut size={15} /> {userEmail}</button></div>
         </div>
       </aside>
@@ -398,13 +475,19 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
       <section className="flex min-w-0 flex-1 flex-col">
         <header className="top-glass z-20 shrink-0 px-3 py-3 md:px-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex min-w-0 items-center gap-3"><Link href="/boards" className="btn-ghost h-10 w-10 lg:hidden"><ArrowLeft size={17} /></Link><div className="min-w-0"><div className="mb-1 flex items-center gap-2 text-[var(--fs-meta)] uppercase tracking-[0.18em] text-[var(--muted)]"><Grid2X2 size={13} /> {visiblePins.length} Pins · {sections.length} Bereiche</div><h2 className="truncate text-[var(--fs-title)] font-semibold tracking-[-0.065em]">{currentBoard.title}</h2></div></div>
+            <div className="flex min-w-0 items-center gap-3"><Link href="/boards" className="top-back-link lg:hidden"><ArrowLeft size={17} /> Alle Boards</Link><div className="min-w-0"><div className="mb-1 flex items-center gap-2 text-[var(--fs-meta)] uppercase tracking-[0.18em] text-[var(--muted)]"><Grid2X2 size={13} /> {visiblePins.length} Pins · {sections.length} Bereiche</div><h2 className="truncate text-[var(--fs-section)] font-semibold tracking-[-0.045em]">{currentBoard.title}</h2></div></div>
             <div className="flex min-w-0 flex-wrap items-center gap-2 md:flex-nowrap">
-              <label className="field flex min-w-[220px] flex-1 items-center gap-2 p-0 px-3 md:w-[360px]"><Search size={16} className="text-[var(--muted)]" /><input ref={searchRef} value={search} onChange={event => setSearch(event.target.value)} placeholder="Titel, Tags, URL, Dateien ..." className="h-10 min-w-0 flex-1 bg-transparent outline-none" /></label>
+              <div className="view-mode-switch" aria-label="Ansicht wählen">
+                <ViewModeButton active={viewMode === 'detailed'} icon={<Grid2X2 size={15} />} label="Detailliert" onClick={() => setViewMode('detailed')} />
+                <ViewModeButton active={viewMode === 'standard'} icon={<ListTree size={15} />} label="Standard" onClick={() => setViewMode('standard')} />
+                <ViewModeButton active={viewMode === 'compact'} icon={<List size={15} />} label="Kompakt" onClick={() => setViewMode('compact')} />
+              </div>
+              <label className="field flex min-w-[210px] flex-1 items-center gap-2 p-0 px-3 md:w-[320px]"><Search size={16} className="text-[var(--muted)]" /><input ref={searchRef} value={search} onChange={event => setSearch(event.target.value)} placeholder="Titel, Tags, URL ..." className="h-10 min-w-0 flex-1 bg-transparent outline-none" /></label>
+              {viewMode === 'detailed' && <select value={sectionFilter} onChange={event => setSectionFilter(event.target.value)} className="field app-select w-auto py-2"><option value="all">Alle Bereiche</option><option value="inbox">Ohne Teilbereich</option>{sections.map(section => <option key={section.id} value={section.id}>{section.title}</option>)}</select>}
               <select value={mediaFilter} onChange={event => setMediaFilter(event.target.value)} className="field app-select w-auto py-2"><option value="all">Alle Typen</option>{mediaKinds.map(kind => <option key={kind} value={kind}>{kind}</option>)}</select>
               <select value={sort} onChange={event => setSort(event.target.value as typeof sort)} className="field app-select w-auto py-2"><option value="position">Manuell</option><option value="newest">Neueste</option><option value="oldest">Älteste</option></select>
               {undo && <button onClick={undoLast} className="btn-ghost h-10 px-3 text-sm"><RotateCcw size={15} /> Rückgängig</button>}
-              <button onClick={() => setSettingsOpen(true)} className="btn-ghost h-10 w-10"><Settings size={17} /></button>
+              <button onClick={() => setSettingsOpen(true)} className="btn-ghost h-10 w-10"><SlidersHorizontal size={17} /></button>
               <button onClick={() => setEditor({ sectionId: null })} className="btn-primary h-10 px-4 text-sm"><Plus size={17} /> Pin</button>
             </div>
           </div>
@@ -419,37 +502,77 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
             className="board-scroll relative flex-1 overflow-y-auto px-3 py-4 pb-28 md:px-5 md:pb-6"
           >
             <div className={`external-drop-hint ${draggingOver ? 'opacity-100' : 'opacity-0'}`}><UploadCloud size={28} /> Link hier ablegen und als Pin importieren</div>
-            <div className="section-stack">
-              {groups.map(group => (
-                <BoardSectionPanel key={group.id ?? 'inbox'} group={group} activeTarget={overSectionId === (group.id ?? 'inbox')} onAdd={sectionId => setEditor({ sectionId })} onRename={renameSection} onToggle={group.id ? () => toggleSection(group.id!) : undefined}>
-                  <SortableContext items={group.pins.map(pin => `pin:${pin.id}`)} strategy={rectSortingStrategy}>
-                    <div className="pin-grid">
-                      {group.pins.map(pin => <PinCard key={pin.id} pin={pin} onOpen={setDetailPin} onEdit={pin => setEditor({ sectionId: pin.section_id, pin })} onDelete={requestDeletePin} onDuplicate={duplicatePin} onArchive={archivePin} onPlay={setPlaying} onContext={(pin, point) => setPinContext({ pin, ...point })} />)}
-                    </div>
-                  </SortableContext>
-                </BoardSectionPanel>
-              ))}
-            </div>
-            {!visiblePins.length && <div className="empty-board-state"><div><Filter className="mx-auto mb-3 text-[var(--muted)]" /><h3>Noch keine Pins sichtbar</h3><p>Füge einen Pin hinzu oder ziehe einen Link aus dem Browser hier hinein.</p></div></div>}
+
+            {viewMode === 'detailed' && (
+              <section className="detailed-board-flow">
+                <div className="detailed-filter-row">
+                  <span><Filter size={14} /> Teilbereichsfilter</span>
+                  {groups.map(group => <button key={group.id ?? 'inbox'} type="button" onClick={() => setSectionFilter(group.id ?? 'inbox')} className={sectionFilter === (group.id ?? 'inbox') ? 'active' : ''}>{group.title}<em>{group.pins.length}</em></button>)}
+                  <button type="button" onClick={() => setSectionFilter('all')} className={sectionFilter === 'all' ? 'active' : ''}>Alle<em>{visiblePins.length}</em></button>
+                </div>
+                <SortableContext items={detailedPins.map(pin => `pin:${pin.id}`)} strategy={rectSortingStrategy}>
+                  <div className="pin-grid pin-grid-detailed">
+                    {detailedPins.map(pin => renderPin(pin, 'detailed'))}
+                  </div>
+                </SortableContext>
+              </section>
+            )}
+
+            {viewMode === 'standard' && (
+              <div className="section-stack">
+                {groups.map(group => (
+                  <BoardSectionPanel key={group.id ?? 'inbox'} group={group} activeTarget={overSectionId === (group.id ?? 'inbox')} onAdd={sectionId => setEditor({ sectionId })} onRename={renameSection} onContext={openSectionContext} onToggle={group.id ? () => toggleSection(group.id!) : undefined}>
+                    <SortableContext items={group.pins.map(pin => `pin:${pin.id}`)} strategy={rectSortingStrategy}>
+                      <div className="pin-grid">
+                        {group.pins.map(pin => renderPin(pin, 'standard'))}
+                      </div>
+                    </SortableContext>
+                  </BoardSectionPanel>
+                ))}
+              </div>
+            )}
+
+            {viewMode === 'compact' && (
+              <div className="section-stack compact-section-stack">
+                {groups.map(group => (
+                  <BoardSectionPanel key={group.id ?? 'inbox'} group={group} activeTarget={overSectionId === (group.id ?? 'inbox')} onAdd={sectionId => setEditor({ sectionId })} onRename={renameSection} onContext={openSectionContext} onToggle={group.id ? () => toggleSection(group.id!) : undefined}>
+                    <SortableContext items={group.pins.map(pin => `pin:${pin.id}`)} strategy={rectSortingStrategy}>
+                      <div className="compact-pin-list">
+                        {group.pins.map(pin => renderPin(pin, 'compact'))}
+                      </div>
+                    </SortableContext>
+                  </BoardSectionPanel>
+                ))}
+              </div>
+            )}
           </div>
-          <DragOverlay dropAnimation={{ duration: 230, easing: 'cubic-bezier(.2,.8,.2,1)' }}>{activePin ? <PinOverlay pin={activePin} /> : null}</DragOverlay>
+
+          <DragOverlay dropAnimation={{ duration: 210, easing: 'cubic-bezier(.2,.8,.2,1)' }}>{activePin ? <PinOverlay pin={activePin} /> : null}</DragOverlay>
         </DndContext>
       </section>
 
       <MobileNav onAdd={() => setEditor({ sectionId: null })} onFocusSearch={() => searchRef.current?.focus()} />
+      {editor && <PinEditor boardId={currentBoard.id} sections={sections} targetSectionId={editor.sectionId ?? null} existingPin={editor.pin ?? null} existingPins={pins} initialUrl={editor.initialUrl} onClose={() => setEditor(null)} onSaved={onSaved} />}
+      {settingsOpen && <BoardSettingsPanel board={currentBoard} pins={pins} onClose={() => setSettingsOpen(false)} onSaved={(next) => { setCurrentBoard(next); setSettingsOpen(false); }} />}
+      {playing && <VideoLightbox pin={playing} onClose={() => setPlaying(null)} />}
+      {detailPin && <PinDetailModal pin={detailPin} onClose={() => setDetailPin(null)} onEdit={(pin) => setEditor({ pin, sectionId: pin.section_id })} onPlay={setPlaying} />}
       {pinContext && <ContextMenu x={pinContext.x} y={pinContext.y} onClose={() => setPinContext(null)} items={[
-        { label: 'Öffnen', icon: pinMenuIcons.ExternalLink, onSelect: () => setDetailPin(pinContext.pin) },
-        { label: 'Bearbeiten', icon: pinMenuIcons.Pencil, onSelect: () => setEditor({ sectionId: pinContext.pin.section_id, pin: pinContext.pin }) },
-        { label: 'Verschieben', icon: pinMenuIcons.FolderInput, onSelect: () => setEditor({ sectionId: pinContext.pin.section_id, pin: pinContext.pin }) },
-        { label: 'Duplizieren', icon: pinMenuIcons.Copy, onSelect: () => duplicatePin(pinContext.pin) },
-        { label: 'Archivieren', icon: pinMenuIcons.Archive, onSelect: () => archivePin(pinContext.pin) },
-        { label: 'Löschen', icon: pinMenuIcons.Trash2, danger: true, onSelect: () => requestDeletePin(pinContext.pin) }
+        { label: 'Öffnen', icon: pinMenuIcons.open, onSelect: () => setDetailPin(pinContext.pin) },
+        { label: 'Bearbeiten', icon: pinMenuIcons.edit, onSelect: () => setEditor({ pin: pinContext.pin, sectionId: pinContext.pin.section_id }) },
+        { label: 'Verschieben', icon: pinMenuIcons.move, onSelect: () => searchRef.current?.focus() },
+        { label: 'Duplizieren', icon: pinMenuIcons.duplicate, onSelect: () => duplicatePin(pinContext.pin) },
+        { label: 'Archivieren', icon: pinMenuIcons.archive, onSelect: () => archivePin(pinContext.pin) },
+        { label: 'Löschen', icon: pinMenuIcons.delete, danger: true, onSelect: () => requestDeletePin(pinContext.pin) }
       ]} />}
-      {editor && <PinEditor boardId={currentBoard.id} sections={sections} targetSectionId={editor.sectionId ?? null} existingPin={editor.pin} existingPins={pins} initialUrl={editor.initialUrl} onClose={() => setEditor(null)} onSaved={onSaved} />}
-      {settingsOpen && <BoardSettingsPanel board={currentBoard} pins={pins} onClose={() => setSettingsOpen(false)} onSaved={board => { setCurrentBoard(board); setSettingsOpen(false); }} />}
-      {detailPin && <PinDetailModal pin={detailPin} onClose={() => setDetailPin(null)} onEdit={pin => setEditor({ sectionId: pin.section_id, pin })} onPlay={setPlaying} />}
+      {sectionContext && <ContextMenu x={sectionContext.x} y={sectionContext.y} onClose={() => setSectionContext(null)} items={[
+        { label: 'Anzeigen', icon: Filter, onSelect: () => { setViewMode('detailed'); setSectionFilter(sectionContext.group.id ?? 'inbox'); } },
+        { label: 'Umbenennen', icon: Settings, disabled: !sectionContext.group.id, onSelect: () => requestRenameSection(sectionContext.group) },
+        { label: 'Nach oben', icon: ArrowUp, disabled: !sectionContext.group.id, onSelect: () => sectionContext.group.id && moveSection(sectionContext.group.id, -1) },
+        { label: 'Nach unten', icon: ArrowDown, disabled: !sectionContext.group.id, onSelect: () => sectionContext.group.id && moveSection(sectionContext.group.id, 1) },
+        { label: 'Alphabetisch sortieren', icon: List, onSelect: sortSectionsAlphabetically },
+        { label: 'Löschen', icon: Trash2, disabled: !sectionContext.group.id, danger: true, onSelect: () => requestDeleteSection(sectionContext.group) }
+      ]} />}
       {confirm && <ConfirmDialog title={confirm.title} message={confirm.message} confirmLabel={confirm.confirmLabel} onCancel={() => setConfirm(null)} onConfirm={confirm.onConfirm} />}
-      <VideoLightbox pin={playing} onClose={() => setPlaying(null)} />
     </main>
   );
 }

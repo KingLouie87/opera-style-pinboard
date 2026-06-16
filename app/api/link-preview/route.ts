@@ -55,24 +55,62 @@ function sourceName(url: URL) {
   return url.hostname.replace(/^www\./, '');
 }
 
+function niceTitleFromUrl(url: URL) {
+  const last = decodeURIComponent(url.pathname.split('/').filter(Boolean).pop() || sourceName(url));
+  return last.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim() || sourceName(url);
+}
+
+function previewFallback(target: URL, reason?: string, contentType: string | null = null) {
+  const cleanDisplayUrl = new URL(target.toString());
+  cleanDisplayUrl.search = '';
+  cleanDisplayUrl.hash = '';
+  const mediaKind = youtubeEmbed(target.toString()) ? 'video' : inferMediaKind(target.toString(), contentType ?? '', null);
+  return NextResponse.json({
+    url: target.toString(),
+    title: niceTitleFromUrl(target),
+    description: reason ? `Automatische Vorschau eingeschränkt: ${reason}. Der Link kann trotzdem gespeichert und manuell ergänzt werden.` : null,
+    favicon: absoluteUrl('/favicon.ico', target),
+    source: sourceName(target),
+    mediaKind,
+    contentType,
+    suggestedTags: autoTags(`${sourceName(target)} ${target.pathname}`).slice(0, 7),
+    images: [],
+    videoEmbedUrl: youtubeEmbed(target.toString()),
+    previewWarning: reason ?? null,
+    displayUrl: cleanDisplayUrl.toString()
+  });
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return NextResponse.json({ error: 'Nicht angemeldet.' }, { status: 401 });
   if (!checkRateLimit(userData.user.id)) return NextResponse.json({ error: 'Zu viele Preview-Anfragen. Bitte kurz warten.' }, { status: 429 });
 
+  let target: URL;
   try {
     const body = schema.parse(await request.json());
-    const target = parseHttpUrl(body.url);
-    const response = await safeFetch(target.toString());
-    if (!response.ok) return NextResponse.json({ error: `Website konnte nicht geladen werden (${response.status}).` }, { status: 400 });
+    target = parseHttpUrl(body.url);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Ungültige URL.' }, { status: 400 });
+  }
 
+  try {
+    const response = await safeFetch(target.toString());
     const contentType = response.headers.get('content-type') ?? '';
+
+    if (!response.ok) {
+      const message = response.status === 403
+        ? 'Die Website blockiert automatische Vorschauen mit 403. Manuelles Speichern bleibt möglich'
+        : `Website konnte nicht vollständig geladen werden (${response.status}). Manuelles Speichern bleibt möglich`;
+      return previewFallback(target, message, contentType);
+    }
+
     const mediaKindFromHeader = inferMediaKind(target.toString(), contentType, null);
     if (!contentType.includes('text/html') && !contentType.includes('application/xhtml')) {
       return NextResponse.json({
         url: target.toString(),
-        title: decodeURIComponent(target.pathname.split('/').pop() || sourceName(target)),
+        title: niceTitleFromUrl(target),
         description: null,
         favicon: absoluteUrl('/favicon.ico', target),
         source: sourceName(target),
@@ -119,7 +157,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       url: target.toString(),
-      title: title?.trim() || null,
+      title: title?.trim() || niceTitleFromUrl(target),
       description: description?.trim() || null,
       favicon,
       source: sourceName(target),
@@ -130,6 +168,6 @@ export async function POST(request: Request) {
       videoEmbedUrl: youtubeEmbed(target.toString())
     });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Preview fehlgeschlagen.' }, { status: 400 });
+    return previewFallback(target, error instanceof Error ? error.message : 'Preview fehlgeschlagen');
   }
 }
