@@ -2915,3 +2915,510 @@ body::before {
     background: rgba(250,248,242,0.92) !important;
   }
 }
+
+/* ==========================================================
+   FINAL GLASS RENDERING FIX
+   Purpose: real transparent Apple/Broken-Horizon glass instead of flat black boxes.
+   This block intentionally overrides earlier experimental glass passes.
+   ========================================================== */
+:root {
+  --final-glass-dark-bg:
+    linear-gradient(135deg,
+      rgba(255,255,255,0.082) 0%,
+      rgba(255,255,255,0.030) 20%,
+      rgba(255,255,255,0.010) 42%,
+      rgba(6,8,10,0.26) 68%,
+      rgba(2,6,7,0.34) 100%
+    );
+  --final-glass-dark-soft:
+    linear-gradient(135deg,
+      rgba(255,255,255,0.068) 0%,
+      rgba(255,255,255,0.026) 26%,
+      rgba(6,8,10,0.20) 70%,
+      rgba(2,6,7,0.30) 100%
+    );
+  --final-glass-dark-input:
+    linear-gradient(135deg,
+      rgba(255,255,255,0.095) 0%,
+      rgba(255,255,255,0.042) 36%,
+      rgba(9,12,15,0.22) 100%
+    );
+  --final-glass-light-bg:
+    linear-gradient(135deg,
+      rgba(255,255,255,0.62) 0%,
+      rgba(255,255,255,0.34) 36%,
+      rgba(244,241,232,0.26) 100%
+    );
+  --final-glass-light-input:
+    linear-gradient(135deg,
+      rgba(255,255,255,0.72) 0%,
+      rgba(255,255,255,0.46) 100%
+    );
+  --final-glass-border-dark: rgba(255,255,255,0.155);
+  --final-glass-border-light: rgba(18,16,12,0.135);
+  --final-glass-filter-dark: blur(36px) saturate(1.65) contrast(1.22) brightness(0.92);
+  --final-glass-filter-light: blur(30px) saturate(1.24) contrast(1.03) brightness(1.04);
+  --final-glass-shadow-dark:
+    inset 0 1px 0 rgba(255,255,255,0.16),
+    inset 0 -1px 0 rgba(255,255,255,0.06),
+    inset 0 -18px 34px rgba(0,0,0,0.16),
+    0 22px 72px rgba(0,0,0,0.36);
+  --final-glass-shadow-dark-strong:
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    inset 0 -1px 0 rgba(255,255,255,0.08),
+    inset 0 -22px 44px rgba(0,0,0,0.18),
+    0 34px 110px rgba(0,0,0,0.48);
+  --final-glass-shadow-light:
+    inset 0 1px 0 rgba(255,255,255,0.82),
+    inset 0 -1px 0 rgba(255,255,255,0.42),
+    inset 0 -14px 34px rgba(255,255,255,0.14),
+    0 18px 60px rgba(34,26,14,0.14);
+}
+
+/* Give glass something visible to refract behind it. */
+html:not([data-theme='light']) body {
+  background:
+    radial-gradient(circle at 10% 8%, rgba(244,241,232,0.060), transparent 34rem),
+    radial-gradient(circle at 72% 0%, rgba(91,59,139,0.100), transparent 38rem),
+    radial-gradient(circle at 42% 72%, rgba(192,192,192,0.035), transparent 42rem),
+    #020607 !important;
+}
+
+html:not([data-theme='light']) .app-shell,
+html:not([data-theme='light']) .dashboard-shell,
+html:not([data-theme='light']) .award-grid-bg {
+  background:
+    radial-gradient(circle at 16% 0%, rgba(244,241,232,0.052), transparent 32rem),
+    radial-gradient(circle at 86% 2%, rgba(91,59,139,0.092), transparent 38rem),
+    linear-gradient(180deg, rgba(255,255,255,0.020), transparent 22rem),
+    #020607 !important;
+}
+
+[data-theme='light'] body,
+[data-theme='light'] .app-shell,
+[data-theme='light'] .dashboard-shell,
+[data-theme='light'] .award-grid-bg {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255,255,255,0.72), transparent 30rem),
+    radial-gradient(circle at 80% 12%, rgba(91,59,139,0.065), transparent 34rem),
+    linear-gradient(180deg, #f4f1ea 0%, #ebe6dc 100%) !important;
+}
+
+/* Universal true glass surfaces. */
+.login-panel,
+.top-glass,
+.dashboard-topbar,
+.clean-toolbar,
+.hero-control-panel,
+.context-menu,
+.move-dialog,
+.confirm-card,
+.pin-detail-card,
+.editor-glass-panel,
+.board-settings-panel,
+.video-lightbox-card,
+.side-glass,
+.mobile-glass-nav {
+  position: relative !important;
+  isolation: isolate !important;
+  overflow: hidden !important;
+  border: 1px solid var(--final-glass-border-dark) !important;
+  background: var(--final-glass-dark-bg) !important;
+  box-shadow: var(--final-glass-shadow-dark) !important;
+  -webkit-backdrop-filter: var(--final-glass-filter-dark) !important;
+  backdrop-filter: var(--final-glass-filter-dark) !important;
+  background-clip: padding-box !important;
+}
+
+.context-menu,
+.move-dialog,
+.confirm-card,
+.pin-detail-card,
+.editor-glass-panel,
+.board-settings-panel,
+.video-lightbox-card,
+.login-panel {
+  box-shadow: var(--final-glass-shadow-dark-strong) !important;
+}
+
+[data-theme='light'] .login-panel,
+[data-theme='light'] .top-glass,
+[data-theme='light'] .dashboard-topbar,
+[data-theme='light'] .clean-toolbar,
+[data-theme='light'] .hero-control-panel,
+[data-theme='light'] .context-menu,
+[data-theme='light'] .move-dialog,
+[data-theme='light'] .confirm-card,
+[data-theme='light'] .pin-detail-card,
+[data-theme='light'] .editor-glass-panel,
+[data-theme='light'] .board-settings-panel,
+[data-theme='light'] .video-lightbox-card,
+[data-theme='light'] .side-glass,
+[data-theme='light'] .mobile-glass-nav {
+  border-color: var(--final-glass-border-light) !important;
+  background: var(--final-glass-light-bg) !important;
+  box-shadow: var(--final-glass-shadow-light) !important;
+  -webkit-backdrop-filter: var(--final-glass-filter-light) !important;
+  backdrop-filter: var(--final-glass-filter-light) !important;
+}
+
+/* Real glass specular highlight and lower lip. */
+.login-panel::before,
+.top-glass::before,
+.dashboard-topbar::before,
+.clean-toolbar::before,
+.hero-control-panel::before,
+.context-menu::before,
+.move-dialog::before,
+.confirm-card::before,
+.pin-detail-card::before,
+.editor-glass-panel::before,
+.board-settings-panel::before,
+.video-lightbox-card::before,
+.side-glass::before,
+.mobile-glass-nav::before,
+.login-panel::after,
+.top-glass::after,
+.dashboard-topbar::after,
+.clean-toolbar::after,
+.hero-control-panel::after,
+.context-menu::after,
+.move-dialog::after,
+.confirm-card::after,
+.pin-detail-card::after,
+.editor-glass-panel::after,
+.board-settings-panel::after,
+.video-lightbox-card::after,
+.side-glass::after,
+.mobile-glass-nav::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+}
+
+.login-panel::before,
+.top-glass::before,
+.dashboard-topbar::before,
+.clean-toolbar::before,
+.hero-control-panel::before,
+.context-menu::before,
+.move-dialog::before,
+.confirm-card::before,
+.pin-detail-card::before,
+.editor-glass-panel::before,
+.board-settings-panel::before,
+.video-lightbox-card::before,
+.side-glass::before,
+.mobile-glass-nav::before {
+  background:
+    linear-gradient(to bottom, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.055) 1px, transparent 22px),
+    radial-gradient(circle at 18% 0%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.052) 20%, transparent 52%) !important;
+  opacity: .42 !important;
+}
+
+.login-panel::after,
+.top-glass::after,
+.dashboard-topbar::after,
+.clean-toolbar::after,
+.hero-control-panel::after,
+.context-menu::after,
+.move-dialog::after,
+.confirm-card::after,
+.pin-detail-card::after,
+.editor-glass-panel::after,
+.board-settings-panel::after,
+.video-lightbox-card::after,
+.side-glass::after,
+.mobile-glass-nav::after {
+  background:
+    linear-gradient(to bottom, transparent 0%, transparent calc(100% - 14px), rgba(255,255,255,0.055) calc(100% - 5px), rgba(255,255,255,0.135) 100%),
+    linear-gradient(to bottom, rgba(255,255,255,0.012), transparent 28%, rgba(0,0,0,0.16) 100%) !important;
+  opacity: .34 !important;
+}
+
+.login-panel > *,
+.top-glass > *,
+.dashboard-topbar > *,
+.clean-toolbar > *,
+.hero-control-panel > *,
+.context-menu > *,
+.move-dialog > *,
+.confirm-card > *,
+.pin-detail-card > *,
+.editor-glass-panel > *,
+.board-settings-panel > *,
+.video-lightbox-card > *,
+.side-glass > *,
+.mobile-glass-nav > * {
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+/* Board topbar: no clipping, enough height, centered controls. */
+.top-glass {
+  min-height: 78px !important;
+  padding: 13px clamp(14px, 2vw, 24px) !important;
+  display: flex !important;
+  align-items: center !important;
+  border-radius: 0 !important;
+  border-top: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-bottom: 1px solid var(--final-glass-border-dark) !important;
+}
+.top-glass > div { width: 100% !important; }
+.top-glass h2 { line-height: 1.05 !important; }
+.top-glass .field,
+.top-glass .app-select,
+.top-glass .btn-ghost,
+.top-glass .btn-primary,
+.top-glass .view-mode-button {
+  min-height: 40px !important;
+  height: 40px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  white-space: nowrap !important;
+}
+.board-scroll { padding-top: clamp(18px, 2.1vw, 26px) !important; }
+
+/* Dashboard toolbar: remove visual clipping and align all controls. */
+.dashboard-topbar {
+  margin: 0 !important;
+  min-height: 62px !important;
+  padding: 10px clamp(18px, 3vw, 48px) !important;
+  border-radius: 0 !important;
+  border-top: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+}
+.clean-toolbar,
+.hero-control-panel-inline {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  flex-wrap: wrap !important;
+  gap: 10px !important;
+  width: auto !important;
+  max-width: min(100%, 720px) !important;
+  padding: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  overflow: visible !important;
+}
+.clean-toolbar::before,
+.clean-toolbar::after,
+.hero-control-panel-inline::before,
+.hero-control-panel-inline::after { display: none !important; }
+.clean-toolbar .field,
+.clean-toolbar .btn-primary,
+.clean-toolbar .btn-ghost,
+.clean-toolbar .app-select,
+.hero-control-panel-inline .field,
+.hero-control-panel-inline .btn-primary,
+.hero-control-panel-inline .btn-ghost,
+.hero-control-panel-inline .app-select {
+  height: 44px !important;
+  min-height: 44px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  border-radius: 9px !important;
+  background: var(--final-glass-dark-input) !important;
+  border: 1px solid rgba(255,255,255,0.13) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 16px 42px rgba(0,0,0,0.18) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.32) !important;
+  backdrop-filter: blur(20px) saturate(1.32) !important;
+}
+.clean-toolbar .hero-search,
+.hero-control-panel-inline .hero-search {
+  width: 230px !important;
+  min-width: 230px !important;
+  max-width: 270px !important;
+  padding: 0 12px !important;
+  overflow: hidden !important;
+}
+.clean-toolbar .hero-search input,
+.hero-control-panel-inline .hero-search input {
+  width: 100% !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  color: rgba(244,241,232,0.92) !important;
+}
+.clean-toolbar .hero-search input::placeholder,
+.hero-control-panel-inline .hero-search input::placeholder { color: rgba(244,241,232,0.58) !important; }
+.clean-toolbar .btn-primary,
+.hero-control-panel-inline .btn-primary { padding: 0 18px !important; min-width: 98px !important; }
+
+/* Login: transparent, not massive. */
+.login-screen {
+  background:
+    linear-gradient(90deg, rgba(2,6,7,0.18) 0%, rgba(2,6,7,0.28) 48%, rgba(2,6,7,0.72) 100%),
+    radial-gradient(circle at 18% 8%, rgba(244,241,232,0.11), transparent 30rem),
+    radial-gradient(circle at 84% 8%, rgba(91,59,139,0.23), transparent 38rem),
+    radial-gradient(ellipse at 50% 88%, rgba(245,245,245,0.090), transparent 30rem),
+    #020607 !important;
+}
+.login-panel {
+  width: min(92vw, 560px) !important;
+  padding: clamp(24px, 4.2vw, 48px) !important;
+  color: rgba(244,241,232,0.94) !important;
+  background: var(--final-glass-dark-bg) !important;
+}
+.login-form input[type='email'],
+.login-password-field,
+.login-mode-tabs,
+.google-login-button,
+.login-message {
+  height: 50px !important;
+  background: var(--final-glass-dark-input) !important;
+  border: 1px solid rgba(255,255,255,0.135) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -8px 18px rgba(0,0,0,0.09) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.38) !important;
+  backdrop-filter: blur(20px) saturate(1.38) !important;
+}
+.login-password-field { padding: 0 10px 0 16px !important; }
+.login-password-field input { height: 100% !important; background: transparent !important; border: 0 !important; box-shadow: none !important; }
+.login-form input,
+.login-password-field input { color: rgba(244,241,232,0.95) !important; }
+.login-form input::placeholder,
+.login-password-field input::placeholder { color: rgba(244,241,232,0.42) !important; }
+.login-password-field button { color: rgba(244,241,232,0.72) !important; }
+.remember-check { display: inline-flex !important; align-items: center !important; gap: 8px !important; }
+.remember-check input { width: 16px !important; height: 16px !important; accent-color: rgba(244,241,232,0.92) !important; }
+.login-row { align-items: center !important; }
+.login-primary-button {
+  background: rgba(244,241,232,0.92) !important;
+  color: #020607 !important;
+  border: 1px solid rgba(255,255,255,0.42) !important;
+}
+
+/* Glass for fields and internal controls without dark slabs. */
+.field,
+.app-select,
+.btn-ghost,
+.detail-close,
+.confirm-close,
+.move-dialog-close,
+.board-card-menu,
+.pin-action,
+.section-icon-button,
+.view-mode-button,
+.top-back-link,
+.move-target-columns button,
+.detail-note,
+.detail-meta span,
+.detail-tags span,
+.detail-links a {
+  background: var(--final-glass-dark-input) !important;
+  border-color: rgba(255,255,255,0.13) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.32) !important;
+  backdrop-filter: blur(20px) saturate(1.32) !important;
+}
+
+/* Viewport/overlay safety. */
+.modal-backdrop {
+  overflow: hidden !important;
+  padding: clamp(12px, 3vw, 32px) !important;
+}
+.context-menu {
+  position: fixed !important;
+  width: min(238px, calc(100vw - 24px)) !important;
+  max-height: calc(100dvh - 24px) !important;
+  overflow: auto !important;
+}
+.pin-detail-card,
+.editor-glass-panel,
+.move-dialog,
+.confirm-card {
+  max-width: calc(100vw - 28px) !important;
+  max-height: calc(100dvh - 28px) !important;
+  overflow: hidden !important;
+}
+
+/* Light mode: force readable dark text on light glass, except image overlays. */
+[data-theme='light'] .field,
+[data-theme='light'] .app-select,
+[data-theme='light'] .btn-ghost,
+[data-theme='light'] .detail-close,
+[data-theme='light'] .confirm-close,
+[data-theme='light'] .move-dialog-close,
+[data-theme='light'] .board-card-menu,
+[data-theme='light'] .pin-action,
+[data-theme='light'] .section-icon-button,
+[data-theme='light'] .view-mode-button,
+[data-theme='light'] .top-back-link,
+[data-theme='light'] .move-target-columns button,
+[data-theme='light'] .detail-note,
+[data-theme='light'] .detail-meta span,
+[data-theme='light'] .detail-tags span,
+[data-theme='light'] .detail-links a,
+[data-theme='light'] .login-form input[type='email'],
+[data-theme='light'] .login-password-field,
+[data-theme='light'] .login-mode-tabs,
+[data-theme='light'] .google-login-button,
+[data-theme='light'] .login-message,
+[data-theme='light'] .clean-toolbar .field,
+[data-theme='light'] .clean-toolbar .btn-primary,
+[data-theme='light'] .clean-toolbar .btn-ghost,
+[data-theme='light'] .clean-toolbar .app-select,
+[data-theme='light'] .hero-control-panel-inline .field,
+[data-theme='light'] .hero-control-panel-inline .btn-primary,
+[data-theme='light'] .hero-control-panel-inline .btn-ghost,
+[data-theme='light'] .hero-control-panel-inline .app-select {
+  background: var(--final-glass-light-input) !important;
+  border-color: rgba(18,16,12,0.13) !important;
+  color: rgba(18,16,12,0.92) !important;
+  text-shadow: none !important;
+}
+[data-theme='light'] input,
+[data-theme='light'] textarea,
+[data-theme='light'] select,
+[data-theme='light'] .context-menu button,
+[data-theme='light'] .login-panel input,
+[data-theme='light'] .login-password-field input,
+[data-theme='light'] .clean-toolbar .hero-search input,
+[data-theme='light'] .hero-control-panel-inline .hero-search input {
+  color: rgba(18,16,12,0.92) !important;
+  text-shadow: none !important;
+}
+[data-theme='light'] input::placeholder,
+[data-theme='light'] textarea::placeholder,
+[data-theme='light'] .clean-toolbar .hero-search input::placeholder,
+[data-theme='light'] .hero-control-panel-inline .hero-search input::placeholder {
+  color: rgba(18,16,12,0.44) !important;
+}
+[data-theme='light'] .login-panel .login-copy h1,
+[data-theme='light'] .login-panel .login-copy p,
+[data-theme='light'] .login-panel .login-copy span,
+[data-theme='light'] .login-panel label > span,
+[data-theme='light'] .login-panel .login-row,
+[data-theme='light'] .login-panel .login-link {
+  color: rgba(18,16,12,0.76) !important;
+  text-shadow: none !important;
+}
+[data-theme='light'] .login-panel .login-copy h1 { color: rgba(18,16,12,0.92) !important; }
+[data-theme='light'] .login-primary-button,
+[data-theme='light'] .btn-primary {
+  color: rgba(244,241,232,0.96) !important;
+  background: rgba(18,16,12,0.92) !important;
+  border-color: rgba(18,16,12,0.16) !important;
+}
+[data-theme='light'] .board-card-glass,
+[data-theme='light'] .board-card-glass *,
+[data-theme='light'] .pin-content-glass,
+[data-theme='light'] .pin-content-glass * {
+  color: rgba(255,255,255,0.95) !important;
+  text-shadow: 0 2px 3px rgba(0,0,0,0.45), 0 12px 28px rgba(0,0,0,0.48) !important;
+}
+
+@media (max-width: 760px) {
+  .top-glass { min-height: auto !important; padding: 12px !important; }
+  .top-glass .field { min-width: min(100%, 210px) !important; }
+  .clean-toolbar,
+  .hero-control-panel-inline { width: 100% !important; max-width: 100% !important; }
+  .clean-toolbar .hero-search,
+  .hero-control-panel-inline .hero-search { flex: 1 1 100% !important; width: 100% !important; min-width: 0 !important; }
+  .login-panel { padding: 24px !important; }
+}
