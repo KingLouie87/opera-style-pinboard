@@ -1,3 +1,5 @@
+export type WorkspaceType = 'private' | 'business';
+
 export type Board = {
   id: string;
   user_id: string;
@@ -5,6 +7,7 @@ export type Board = {
   description: string | null;
   cover_url: string | null;
   cover_path: string | null;
+  workspace_type: WorkspaceType | null;
   archived_at: string | null;
   deleted_at: string | null;
   created_at: string;

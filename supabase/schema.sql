@@ -10,6 +10,7 @@ create table if not exists public.boards (
   description text,
   cover_url text,
   cover_path text,
+  workspace_type text not null default 'private' check (workspace_type in ('private','business')),
   archived_at timestamptz,
   deleted_at timestamptz,
   created_at timestamptz not null default now(),
@@ -74,6 +75,7 @@ create table if not exists public.pin_images (
 );
 
 create index if not exists boards_user_idx on public.boards(user_id, updated_at desc);
+create index if not exists boards_workspace_idx on public.boards(user_id, workspace_type, updated_at desc) where deleted_at is null;
 create index if not exists boards_archive_idx on public.boards(user_id, archived_at) where deleted_at is null;
 create index if not exists board_sections_board_idx on public.board_sections(board_id, position);
 create index if not exists pins_section_idx on public.pins(section_id, position) where deleted_at is null;

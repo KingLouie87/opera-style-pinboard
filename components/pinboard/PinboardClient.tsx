@@ -20,7 +20,7 @@ import {
   useSensors
 } from '@dnd-kit/core';
 import { rectSortingStrategy, SortableContext, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { ArrowLeft, ChevronDown, ChevronRight, Filter, Grid2X2, Layers3, LogOut, Moon, Plus, RotateCcw, Search, Settings, Sun, UploadCloud } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Edit3, Filter, Grid2X2, Layers3, LogOut, Moon, Plus, RotateCcw, Search, Settings, Sun, UploadCloud, X } from 'lucide-react';
 import { Board, BoardSection, Pin } from '@/lib/types';
 import { createClient } from '@/lib/supabase/browser';
 import { nextPosition, normalizePositions } from '@/lib/position';
@@ -50,37 +50,84 @@ function SectionDropButton({ id, label, count, active }: { id: string | null; la
     <a
       ref={setNodeRef}
       href={`#section-${id ?? 'inbox'}`}
-      className={`flex w-full items-center justify-between rounded-[7px] border px-3 py-2 text-left text-sm transition ${isOver || active ? 'border-[var(--accent)] bg-white/[0.09] text-[var(--text)]' : 'border-transparent text-[var(--text-soft)] hover:bg-white/[0.055]'}`}
+      className={`section-nav-pill ${isOver || active ? 'section-nav-pill-active' : ''}`}
     >
       <span className="truncate">{label}</span>
-      <span className="text-xs text-[var(--muted)]">{count}</span>
+      <span>{count}</span>
     </a>
   );
 }
 
-function BoardSectionPanel({ group, onAdd, onToggle, activeTarget, children }: { group: DisplayGroup; onAdd: (sectionId: string | null) => void; onToggle?: () => void; activeTarget?: boolean; children: ReactNode }) {
+function BoardSectionPanel({ group, onAdd, onToggle, onRename, activeTarget, children }: {
+  group: DisplayGroup;
+  onAdd: (sectionId: string | null) => void;
+  onToggle?: () => void;
+  onRename?: (sectionId: string, title: string) => void;
+  activeTarget?: boolean;
+  children: ReactNode;
+}) {
   const { setNodeRef, isOver } = useDroppable({ id: `section:${group.id ?? 'inbox'}` });
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(group.title);
   const preview = group.pins.slice(0, 4).filter(pin => pin.image_url);
+  const isDropTarget = isOver || activeTarget;
+
+  function submitRename() {
+    const next = draft.trim();
+    if (group.id && next && next !== group.title) onRename?.(group.id, next);
+    setEditing(false);
+  }
+
+  function cancelRename() {
+    setDraft(group.title);
+    setEditing(false);
+  }
 
   return (
-    <section id={`section-${group.id ?? 'inbox'}`} ref={setNodeRef} className={`section-panel transition ${group.collapsed ? 'section-panel-collapsed' : ''} ${isOver || activeTarget ? 'section-panel-over' : ''}`}>
+    <section id={`section-${group.id ?? 'inbox'}`} ref={setNodeRef} className={`section-panel transition ${group.collapsed ? 'section-panel-collapsed' : ''} ${isDropTarget ? 'section-panel-over' : ''}`}>
       <header className="section-header">
-        <button type="button" onClick={onToggle} className="flex min-w-0 flex-1 items-center gap-3 text-left" disabled={group.isInbox}>
+        <button type="button" onClick={onToggle} className="section-title-button" disabled={group.isInbox || editing}>
           {group.isInbox ? <Layers3 size={17} className="text-[var(--accent)]" /> : group.collapsed ? <ChevronRight size={17} /> : <ChevronDown size={17} />}
-          <span className="min-w-0">
-            <span className="block truncate text-lg font-semibold tracking-[-0.04em]">{group.title}</span>
-            <span className="mt-0.5 block text-xs text-[var(--muted)]">{group.pins.length} Pins{group.description ? ` · ${group.description}` : ''}</span>
-          </span>
+          {editing ? (
+            <span className="section-rename-wrap" onClick={event => event.stopPropagation()}>
+              <input
+                autoFocus
+                value={draft}
+                onChange={event => setDraft(event.target.value)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter') submitRename();
+                  if (event.key === 'Escape') cancelRename();
+                }}
+                className="section-rename-input"
+              />
+            </span>
+          ) : (
+            <span className="min-w-0">
+              <span className="section-title-text">{group.title}</span>
+              <span className="section-subtitle">{group.pins.length} Pins{group.description ? ` · ${group.description}` : ''}</span>
+            </span>
+          )}
         </button>
-        <div className="hidden items-center gap-1 md:flex">
-          {group.collapsed && preview.map(pin => <img key={pin.id} src={pin.image_url!} alt="" className="h-8 w-8 rounded-[5px] border border-white/10 object-cover" />)}
-        </div>
-        <button type="button" onClick={() => onAdd(group.id)} className="btn-ghost h-9 px-3 text-sm"><Plus size={15} /> Pin</button>
+
+        {editing ? (
+          <div className="section-edit-actions">
+            <button type="button" onClick={submitRename} className="section-icon-button" aria-label="Namen speichern"><Check size={15} /></button>
+            <button type="button" onClick={cancelRename} className="section-icon-button" aria-label="Umbenennen abbrechen"><X size={15} /></button>
+          </div>
+        ) : (
+          <>
+            <div className="hidden items-center gap-1 md:flex">
+              {group.collapsed && preview.map(pin => <img key={pin.id} src={pin.image_url!} alt="" className="h-8 w-8 rounded-[9px] border border-white/10 object-cover" />)}
+            </div>
+            {!group.isInbox && <button type="button" onClick={() => { setDraft(group.title); setEditing(true); }} className="section-icon-button section-rename-button" aria-label="Teilbereich umbenennen"><Edit3 size={15} /></button>}
+            <button type="button" onClick={() => onAdd(group.id)} className="btn-ghost h-9 px-3 text-sm"><Plus size={15} /> Pin</button>
+          </>
+        )}
       </header>
 
       {group.collapsed ? (
         <div className="collapsed-drop-zone" onClick={() => group.id && onToggle?.()}>
-          <span>{activeTarget || isOver ? 'Hier ablegen' : 'Minimierter Teilbereich'}</span>
+          <span>{isDropTarget ? 'Hier ablegen' : 'Minimierter Teilbereich'}</span>
           <strong>{group.pins.length}</strong>
         </div>
       ) : (
@@ -119,8 +166,8 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
   const supabase = createClient();
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 10 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 190, tolerance: 9 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 7 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 160, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
@@ -194,6 +241,11 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
       .select('*')
       .single();
     if (data) setSections(current => [...current, data as BoardSection]);
+  }
+
+  async function renameSection(sectionId: string, title: string) {
+    setSections(current => current.map(item => item.id === sectionId ? { ...item, title } : item));
+    await supabase.from('board_sections').update({ title }).eq('id', sectionId);
   }
 
   async function toggleSection(sectionId: string) {
@@ -324,30 +376,37 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
   }
 
   return (
-    <main className="app-shell flex h-dvh overflow-hidden">
-      <aside className="hidden w-[292px] shrink-0 border-r border-[var(--line)] bg-black/24 p-3 backdrop-blur-2xl lg:flex lg:flex-col">
-        <Link href="/boards" className="btn-ghost mb-3 h-10 justify-start px-3 text-sm"><ArrowLeft size={16} /> Alle Boards</Link>
-        <div className="mb-4 overflow-hidden rounded-[8px] border border-[var(--line)] bg-white/[0.035]">
-          {currentBoard.cover_url && <img src={currentBoard.cover_url} alt="" className="h-32 w-full object-cover" />}
-          <div className="p-3"><p className="font-mono text-[10px] uppercase tracking-[0.28em] text-[var(--accent)]">Pinboard</p><h1 className="mt-1 line-clamp-2 text-xl font-semibold tracking-[-0.05em]">{currentBoard.title}</h1></div>
+    <main className="app-shell award-grid-bg flex h-dvh overflow-hidden">
+      <aside className="hidden w-[286px] shrink-0 p-4 lg:flex lg:flex-col">
+        <div className="side-glass flex min-h-0 flex-1 flex-col">
+          <Link href="/boards" className="btn-ghost mb-3 h-10 justify-start px-3 text-sm"><ArrowLeft size={16} /> Alle Boards</Link>
+          <div className="board-side-cover">
+            {currentBoard.cover_url && <img src={currentBoard.cover_url} alt="" />}
+            <div>
+              <p>Pinboard</p>
+              <h1>{currentBoard.title}</h1>
+            </div>
+          </div>
+          <div className="section-nav-list">
+            {groups.map(group => <SectionDropButton key={group.id ?? 'inbox'} id={group.id} label={group.title} count={group.pins.length} active={overSectionId === (group.id ?? 'inbox')} />)}
+          </div>
+          <button onClick={addSection} className="btn-ghost mt-3 px-3 py-2 text-sm"><Plus size={15} /> Teilbereich</button>
+          <div className="mt-auto space-y-2 pt-4"><button onClick={toggleTheme} className="btn-ghost w-full justify-start px-3 py-2 text-sm"><Moon size={15} /><Sun size={15} className="opacity-50" /> Theme</button><button onClick={signOut} className="btn-ghost w-full justify-start px-3 py-2 text-sm"><LogOut size={15} /> {userEmail}</button></div>
         </div>
-        <div className="space-y-1">
-          {groups.map(group => <SectionDropButton key={group.id ?? 'inbox'} id={group.id} label={group.title} count={group.pins.length} />)}
-        </div>
-        <button onClick={addSection} className="btn-ghost mt-3 px-3 py-2 text-sm"><Plus size={15} /> Teilbereich</button>
-        <div className="mt-auto space-y-2 pt-4"><button onClick={toggleTheme} className="btn-ghost w-full justify-start px-3 py-2 text-sm"><Moon size={15} /><Sun size={15} className="opacity-50" /> Theme</button><button onClick={signOut} className="btn-ghost w-full justify-start px-3 py-2 text-sm"><LogOut size={15} /> {userEmail}</button></div>
       </aside>
 
       <section className="flex min-w-0 flex-1 flex-col">
-        <header className="z-20 flex min-h-[74px] shrink-0 flex-col gap-3 border-b border-[var(--line)] bg-[var(--bg)]/76 px-3 py-3 backdrop-blur-2xl md:flex-row md:items-center md:justify-between md:px-5">
-          <div className="flex min-w-0 items-center gap-3"><Link href="/boards" className="btn-ghost h-10 w-10 lg:hidden"><ArrowLeft size={17} /></Link><div className="min-w-0"><div className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.28em] text-[var(--muted)]"><Grid2X2 size={13} /> {visiblePins.length} Pins · {sections.length} Bereiche</div><h2 className="truncate text-2xl font-semibold tracking-[-0.055em]">{currentBoard.title}</h2></div></div>
-          <div className="flex min-w-0 flex-wrap items-center gap-2 md:flex-nowrap">
-            <label className="field flex min-w-[220px] flex-1 items-center gap-2 p-0 px-3 md:w-[360px]"><Search size={16} className="text-[var(--muted)]" /><input ref={searchRef} value={search} onChange={event => setSearch(event.target.value)} placeholder="Titel, Tags, URL, Dateien ..." className="h-10 min-w-0 flex-1 bg-transparent outline-none" /></label>
-            <select value={mediaFilter} onChange={event => setMediaFilter(event.target.value)} className="field w-auto py-2"><option value="all">Alle Typen</option>{mediaKinds.map(kind => <option key={kind} value={kind}>{kind}</option>)}</select>
-            <select value={sort} onChange={event => setSort(event.target.value as typeof sort)} className="field w-auto py-2"><option value="position">Manuell</option><option value="newest">Neueste</option><option value="oldest">Älteste</option></select>
-            {undo && <button onClick={undoLast} className="btn-ghost h-10 px-3 text-sm"><RotateCcw size={15} /> Rückgängig</button>}
-            <button onClick={() => setSettingsOpen(true)} className="btn-ghost h-10 w-10"><Settings size={17} /></button>
-            <button onClick={() => setEditor({ sectionId: null })} className="btn-primary h-10 px-4 text-sm"><Plus size={17} /> Pin</button>
+        <header className="top-glass z-20 shrink-0 px-3 py-3 md:px-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex min-w-0 items-center gap-3"><Link href="/boards" className="btn-ghost h-10 w-10 lg:hidden"><ArrowLeft size={17} /></Link><div className="min-w-0"><div className="mb-1 flex items-center gap-2 text-[var(--fs-meta)] uppercase tracking-[0.18em] text-[var(--muted)]"><Grid2X2 size={13} /> {visiblePins.length} Pins · {sections.length} Bereiche</div><h2 className="truncate text-[var(--fs-title)] font-semibold tracking-[-0.065em]">{currentBoard.title}</h2></div></div>
+            <div className="flex min-w-0 flex-wrap items-center gap-2 md:flex-nowrap">
+              <label className="field flex min-w-[220px] flex-1 items-center gap-2 p-0 px-3 md:w-[360px]"><Search size={16} className="text-[var(--muted)]" /><input ref={searchRef} value={search} onChange={event => setSearch(event.target.value)} placeholder="Titel, Tags, URL, Dateien ..." className="h-10 min-w-0 flex-1 bg-transparent outline-none" /></label>
+              <select value={mediaFilter} onChange={event => setMediaFilter(event.target.value)} className="field app-select w-auto py-2"><option value="all">Alle Typen</option>{mediaKinds.map(kind => <option key={kind} value={kind}>{kind}</option>)}</select>
+              <select value={sort} onChange={event => setSort(event.target.value as typeof sort)} className="field app-select w-auto py-2"><option value="position">Manuell</option><option value="newest">Neueste</option><option value="oldest">Älteste</option></select>
+              {undo && <button onClick={undoLast} className="btn-ghost h-10 px-3 text-sm"><RotateCcw size={15} /> Rückgängig</button>}
+              <button onClick={() => setSettingsOpen(true)} className="btn-ghost h-10 w-10"><Settings size={17} /></button>
+              <button onClick={() => setEditor({ sectionId: null })} className="btn-primary h-10 px-4 text-sm"><Plus size={17} /> Pin</button>
+            </div>
           </div>
         </header>
 
@@ -359,10 +418,10 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
             onDrop={event => onExternalDrop(event, null)}
             className="board-scroll relative flex-1 overflow-y-auto px-3 py-4 pb-28 md:px-5 md:pb-6"
           >
-            <div className={`pointer-events-none absolute inset-4 z-10 grid place-items-center rounded-[10px] border border-dashed border-[var(--accent)] bg-[var(--accent)]/10 text-sm font-semibold text-[var(--text)] backdrop-blur-xl transition ${draggingOver ? 'opacity-100' : 'opacity-0'}`}><UploadCloud size={28} /> Link hier ablegen und als Pin importieren</div>
-            <div className="space-y-4">
+            <div className={`external-drop-hint ${draggingOver ? 'opacity-100' : 'opacity-0'}`}><UploadCloud size={28} /> Link hier ablegen und als Pin importieren</div>
+            <div className="section-stack">
               {groups.map(group => (
-                <BoardSectionPanel key={group.id ?? 'inbox'} group={group} activeTarget={overSectionId === (group.id ?? 'inbox')} onAdd={sectionId => setEditor({ sectionId })} onToggle={group.id ? () => toggleSection(group.id!) : undefined}>
+                <BoardSectionPanel key={group.id ?? 'inbox'} group={group} activeTarget={overSectionId === (group.id ?? 'inbox')} onAdd={sectionId => setEditor({ sectionId })} onRename={renameSection} onToggle={group.id ? () => toggleSection(group.id!) : undefined}>
                   <SortableContext items={group.pins.map(pin => `pin:${pin.id}`)} strategy={rectSortingStrategy}>
                     <div className="pin-grid">
                       {group.pins.map(pin => <PinCard key={pin.id} pin={pin} onOpen={setDetailPin} onEdit={pin => setEditor({ sectionId: pin.section_id, pin })} onDelete={requestDeletePin} onDuplicate={duplicatePin} onArchive={archivePin} onPlay={setPlaying} onContext={(pin, point) => setPinContext({ pin, ...point })} />)}
@@ -371,7 +430,7 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
                 </BoardSectionPanel>
               ))}
             </div>
-            {!visiblePins.length && <div className="mt-4 grid min-h-[45vh] place-items-center rounded-[10px] border border-dashed border-[var(--line)] text-center"><div><Filter className="mx-auto mb-3 text-[var(--muted)]" /><h3 className="text-xl font-semibold tracking-[-0.04em]">Noch keine Pins sichtbar</h3><p className="mt-2 text-sm text-[var(--muted)]">Füge einen Pin hinzu oder ziehe einen Link aus dem Browser hier hinein.</p></div></div>}
+            {!visiblePins.length && <div className="empty-board-state"><div><Filter className="mx-auto mb-3 text-[var(--muted)]" /><h3>Noch keine Pins sichtbar</h3><p>Füge einen Pin hinzu oder ziehe einen Link aus dem Browser hier hinein.</p></div></div>}
           </div>
           <DragOverlay dropAnimation={{ duration: 230, easing: 'cubic-bezier(.2,.8,.2,1)' }}>{activePin ? <PinOverlay pin={activePin} /> : null}</DragOverlay>
         </DndContext>

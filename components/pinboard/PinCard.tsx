@@ -2,7 +2,7 @@
 
 import { CSS } from '@dnd-kit/utilities';
 import { useSortable } from '@dnd-kit/sortable';
-import { FileText, MoreHorizontal, Play } from 'lucide-react';
+import { FileText, GripVertical, MoreHorizontal, Play } from 'lucide-react';
 import { youtubeEmbed } from '@/lib/media';
 import { Pin } from '@/lib/types';
 
@@ -30,13 +30,14 @@ function formatSource(pin: Pin) {
   }
 }
 
+function titleForPin(pin: Pin) {
+  return pin.title || pin.source || pin.file_name || 'Unbenannter Pin';
+}
+
 export function PinVisual({ pin, floating = false }: { pin: Pin; floating?: boolean }) {
   const isVideo = pin.media_kind === 'video' || Boolean(youtubeEmbed(pin.url));
-  const title = pin.title || pin.source || pin.file_name || 'Unbenannter Pin';
-  const description = pin.description?.trim();
+  const title = titleForPin(pin);
   const accent = pin.color || pin.dominant_color || '#8f8a80';
-  const tags = (pin.tags ?? []).slice(0, 5);
-  const hasLongDescription = Boolean(description && description.split(/\s+/).length > 30);
   const source = formatSource(pin);
 
   return (
@@ -46,7 +47,7 @@ export function PinVisual({ pin, floating = false }: { pin: Pin; floating?: bool
     >
       <div
         className={`pin-cover ${pin.image_url ? '' : 'pin-cover-empty'}`}
-        style={{ aspectRatio: pin.aspect_ratio ? `${Math.max(0.72, Math.min(Number(pin.aspect_ratio), 0.92))}` : '3 / 4' }}
+        style={{ aspectRatio: pin.aspect_ratio ? `${Math.max(0.72, Math.min(Number(pin.aspect_ratio), 1.12))}` : '4 / 5' }}
       >
         {pin.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -59,19 +60,13 @@ export function PinVisual({ pin, floating = false }: { pin: Pin; floating?: bool
         )}
 
         <div className="pin-image-vignette" />
+        <div className="pin-liquid-shine" />
+
         {isVideo && <div className="pin-type-badge"><Play size={12} fill="currentColor" /> Video</div>}
 
         <div className="pin-content-glass">
           <p className="pin-source">{source}</p>
           <h3 className="pin-title">{title}</h3>
-          {description && (
-            <p className={`pin-description ${hasLongDescription ? 'pin-description-fade' : ''}`}>{description}</p>
-          )}
-          {!!tags.length && (
-            <div className="pin-tags">
-              {tags.map(tag => <span key={tag}>#{tag}</span>)}
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -80,7 +75,7 @@ export function PinVisual({ pin, floating = false }: { pin: Pin; floating?: bool
 
 export function PinOverlay({ pin }: { pin: Pin }) {
   return (
-    <div className="pointer-events-none w-[264px] max-w-[72vw] animate-[pin-float_.18s_cubic-bezier(.2,.8,.2,1)]">
+    <div className="pointer-events-none w-[260px] max-w-[72vw] animate-[pin-float_.18s_cubic-bezier(.2,.8,.2,1)]">
       <PinVisual pin={pin} floating />
     </div>
   );
@@ -105,16 +100,25 @@ export function PinCard({ pin, onOpen, onPlay, onContext }: { pin: Pin } & PinAc
     <article
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
+      onClick={() => onOpen?.(pin)}
       onContextMenu={openContext}
-      onDoubleClick={() => onOpen?.(pin)}
-      className={`pin-card group relative touch-none select-none transition duration-200 ${isDragging ? 'pin-card-placeholder' : ''}`}
+      className={`pin-card group relative select-none transition duration-200 ${isDragging ? 'pin-card-placeholder' : ''}`}
       aria-label={pin.title || 'Pin'}
     >
       <PinVisual pin={pin} />
 
       <div className="pin-actions">
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          onClick={stop}
+          className="pin-action pin-drag-handle"
+          aria-label="Pin verschieben"
+          title="Pin verschieben"
+        >
+          <GripVertical size={15} />
+        </button>
         {isVideo && (
           <button type="button" onPointerDown={stop} onClick={(event) => { stop(event); onPlay?.(pin); }} className="pin-action" aria-label="Video abspielen"><Play size={15} fill="currentColor" /></button>
         )}
