@@ -1544,3 +1544,415 @@ body {
 }
 .login-form > label > span { display: block; margin-bottom: 7px; color: rgba(255,255,255,.62); font-size: .74rem; }
 .remember-check span { display: inline !important; margin: 0 !important; color: inherit !important; font-size: inherit !important; }
+
+/* ==========================================================
+   Broken Horizon brand transfer: fonts and cinematic glass
+   Derived from the Broken Horizon website header, hero and world-status CSS.
+   ========================================================== */
+:root {
+  --bh-app-black: #020607;
+  --bh-app-panel: #070a0c;
+  --bh-app-dark-rgb: 2, 6, 7;
+  --bh-app-text: rgba(244, 241, 232, 0.92);
+  --bh-app-text-solid: #f3f1ec;
+  --bh-app-muted: rgba(244, 241, 232, 0.58);
+  --bh-app-faint: rgba(244, 241, 232, 0.34);
+  --bh-app-line: rgba(255, 255, 255, 0.105);
+  --bh-app-line-soft: rgba(255, 255, 255, 0.06);
+  --bh-app-glow: rgba(245, 250, 245, 0.10);
+  --app-font-display: "Sora", "Geist", "Inter", system-ui, sans-serif;
+  --app-font-body: "Geist", "Inter", system-ui, sans-serif;
+  --app-font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  --app-glass-header-bg:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.032) 0%,
+      rgba(255, 255, 255, 0.016) 22%,
+      rgba(18, 20, 23, 0.52) 56%,
+      rgba(4, 6, 8, 0.74) 100%
+    );
+  --app-glass-header-border: rgba(255, 255, 255, 0.105);
+  --app-glass-header-shadow:
+    inset 0 -1px 0 rgba(255, 255, 255, 0.105),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.54),
+    inset 0 -16px 30px rgba(0, 0, 0, 0.24),
+    inset 0 0 20px rgba(255, 255, 255, 0.016),
+    0 14px 42px rgba(0, 0, 0, 0.42);
+  --app-glass-panel-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.55),
+    inset 0 -14px 24px rgba(0, 0, 0, 0.24),
+    0 32px 90px rgba(0, 0, 0, 0.46);
+}
+
+html,
+body {
+  font-family: var(--app-font-body);
+  font-kerning: normal;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  font-optical-sizing: auto;
+  text-rendering: geometricPrecision;
+  background: var(--bh-app-black);
+}
+
+body,
+.app-shell,
+.login-screen {
+  color: var(--bh-app-text);
+}
+
+h1,
+h2,
+h3,
+.dashboard-hero h1,
+.board-gallery-card h2,
+.board-card-glass h2,
+.login-copy h1,
+.board-side-cover h1,
+.top-glass h2,
+.pin-title {
+  font-family: var(--app-font-display);
+  font-kerning: normal;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  font-optical-sizing: auto;
+  text-rendering: geometricPrecision;
+}
+
+.hero-eyebrow,
+.board-gallery-card p,
+.board-card-glass p,
+.pin-domain,
+.pin-meta,
+.login-copy p,
+.top-glass .text-\[var\(--fs-meta\)\],
+.context-menu,
+.app-select,
+.field input::placeholder,
+.move-dialog > p,
+.move-target-columns h3 {
+  font-family: var(--app-font-mono);
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: var(--app-font-body);
+  font-kerning: normal;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+}
+
+/* Broken Horizon login atmosphere */
+.login-screen {
+  position: relative;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: clamp(22px, 4vw, 54px);
+  background:
+    linear-gradient(90deg, rgba(var(--bh-app-dark-rgb), 0.00) 0%, rgba(var(--bh-app-dark-rgb), 0.14) 45%, rgba(var(--bh-app-dark-rgb), 0.86) 100%),
+    radial-gradient(circle at 78% 12%, rgba(91, 59, 139, 0.28), transparent 34rem),
+    radial-gradient(ellipse at 36% 76%, rgba(245, 245, 245, 0.10), transparent 28rem),
+    radial-gradient(circle at 12% 18%, rgba(192, 192, 192, 0.075), transparent 20rem),
+    #020607;
+  isolation: isolate;
+}
+
+.login-screen::before,
+.login-screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.login-screen::before {
+  z-index: 0;
+  opacity: 0.42;
+  background:
+    radial-gradient(ellipse at 52% 78%, rgba(245, 245, 245, 0.105) 0%, rgba(245, 245, 245, 0.048) 18%, rgba(245, 245, 245, 0.018) 34%, rgba(var(--bh-app-dark-rgb), 0.00) 58%),
+    radial-gradient(ellipse at 58% 58%, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.016) 24%, rgba(var(--bh-app-dark-rgb), 0.00) 56%);
+  filter: blur(64px);
+  animation: bhFogDriftApp 18s ease-in-out infinite;
+}
+
+.login-screen::after {
+  z-index: 0;
+  opacity: 0.03;
+  mix-blend-mode: soft-light;
+  background-image: radial-gradient(circle, rgba(255,255,255,0.35) 0 1px, transparent 1px);
+  background-size: 3px 3px;
+}
+
+.login-bg-svg {
+  position: absolute;
+  inset: -10% -5%;
+  z-index: 0;
+  opacity: 0.78;
+  background:
+    linear-gradient(115deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.026) 40%, rgba(255,255,255,0) 68%),
+    radial-gradient(circle at 18% 0%, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.035) 18%, transparent 48%),
+    url("data:image/svg+xml,%3Csvg width='920' height='680' viewBox='0 0 920 680' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='rgba(244,241,232,0.10)' stroke-width='1'%3E%3Cpath d='M90 565 C190 410 240 360 360 330 C480 302 548 208 655 118'/%3E%3Cpath d='M170 610 C270 476 386 442 496 390 C616 334 698 216 812 88'/%3E%3Cpath d='M-24 344 C118 302 226 232 326 122'/%3E%3Cpath d='M570 682 C616 556 704 452 910 388'/%3E%3C/g%3E%3Cg fill='rgba(244,241,232,0.10)'%3E%3Ccircle cx='654' cy='118' r='2'/%3E%3Ccircle cx='496' cy='390' r='2'/%3E%3Ccircle cx='326' cy='122' r='2'/%3E%3C/g%3E%3C/svg%3E") center/cover no-repeat;
+}
+
+.login-panel {
+  position: relative;
+  z-index: 2;
+  width: min(92vw, 560px);
+  overflow: hidden;
+  border: none;
+  border-bottom: 1px solid var(--app-glass-header-border);
+  border-radius: 9px;
+  padding: clamp(28px, 4vw, 48px);
+  color: var(--bh-app-text-solid);
+  background: var(--app-glass-header-bg) !important;
+  box-shadow: var(--app-glass-header-shadow) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(1.5) contrast(1.3) brightness(0.84) !important;
+  backdrop-filter: blur(30px) saturate(1.5) contrast(1.3) brightness(0.84) !important;
+  transform: translate3d(0,0,0);
+  isolation: isolate;
+}
+
+.login-panel::before,
+.login-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.login-panel::before {
+  background:
+    linear-gradient(to bottom, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.025) 1px, transparent 18px),
+    radial-gradient(circle at 18% 0%, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.035) 18%, transparent 48%);
+  opacity: 0.25;
+}
+
+.login-panel::after {
+  background:
+    linear-gradient(to bottom, transparent 0%, transparent calc(100% - 12px), rgba(255,255,255,0.055) calc(100% - 4px), rgba(255,255,255,0.105) 100%),
+    linear-gradient(to bottom, rgba(255,255,255,0.014) 0%, transparent 28%, rgba(0,0,0,0.20) 100%);
+  opacity: 0.20;
+}
+
+.login-panel > * {
+  position: relative;
+  z-index: 2;
+}
+
+.login-logo-orbit {
+  width: 42px;
+  height: 42px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  border: 2px dashed rgba(244,241,232,.76);
+  box-shadow: 0 0 24px rgba(245,250,245,.08);
+}
+
+.login-copy p {
+  color: var(--bh-app-muted);
+  letter-spacing: .08em;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.login-copy h1 {
+  color: var(--bh-app-text-solid);
+  font-size: clamp(2.45rem, 5vw, 3.65rem);
+  line-height: .93;
+  font-weight: 680;
+  letter-spacing: -.055em;
+  text-shadow: 0 2px 2px rgba(0,0,0,.22), 0 10px 26px rgba(0,0,0,.38), 0 0 24px var(--bh-app-glow);
+}
+
+.login-copy span {
+  color: rgba(244,241,232,.68);
+}
+
+.login-form input[type='email'],
+.login-password-field,
+.login-mode-tabs,
+.google-login-button,
+.login-message {
+  border-color: rgba(255,255,255,.13) !important;
+  background: rgba(255,255,255,.035) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+}
+
+.login-form input:focus,
+.login-password-field:focus-within {
+  border-color: rgba(244,241,232,.34) !important;
+  box-shadow: 0 0 0 3px rgba(244,241,232,.075), inset 0 1px 0 rgba(255,255,255,.08) !important;
+}
+
+.login-primary-button {
+  background: rgba(244,241,232,.92) !important;
+  color: #020607 !important;
+  font-weight: 760;
+  letter-spacing: -.012em;
+}
+
+/* Broken Horizon header material for opened board topbar */
+.top-glass {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  width: 100%;
+  overflow: hidden;
+  isolation: isolate;
+  border: none !important;
+  border-radius: 0 !important;
+  border-bottom: 1px solid var(--app-glass-header-border) !important;
+  background: var(--app-glass-header-bg) !important;
+  box-shadow: var(--app-glass-header-shadow) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(1.5) contrast(1.3) brightness(0.84) !important;
+  backdrop-filter: blur(30px) saturate(1.5) contrast(1.3) brightness(0.84) !important;
+  transform: translate3d(0,0,0);
+}
+
+.top-glass::before,
+.top-glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.top-glass::before {
+  background:
+    linear-gradient(to bottom, rgba(255,255,255,.07) 0%, rgba(255,255,255,.025) 1px, transparent 18px),
+    radial-gradient(circle at 18% 0%, rgba(255,255,255,.10) 0%, rgba(255,255,255,.035) 18%, transparent 48%);
+  opacity: .25;
+}
+
+.top-glass::after {
+  background:
+    linear-gradient(to bottom, transparent 0%, transparent calc(100% - 12px), rgba(255,255,255,.055) calc(100% - 4px), rgba(255,255,255,.105) 100%),
+    linear-gradient(to bottom, rgba(255,255,255,.014) 0%, transparent 28%, rgba(0,0,0,.20) 100%);
+  opacity: .20;
+}
+
+.top-glass > * {
+  position: relative;
+  z-index: 2;
+}
+
+.top-glass h2 {
+  color: var(--bh-app-text-solid);
+  letter-spacing: -.038em;
+  font-weight: 760;
+}
+
+.top-back-link {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--bh-app-muted) !important;
+  font-family: var(--app-font-mono);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  font-size: 10px !important;
+}
+
+.top-back-link:hover {
+  color: var(--bh-app-text) !important;
+  background: rgba(255,255,255,.045) !important;
+}
+
+/* Dashboard aligns with website typography without becoming the website itself. */
+.dashboard-hero h1 {
+  font-family: var(--app-font-display);
+  color: var(--bh-app-text);
+  font-weight: 800;
+  letter-spacing: -.062em;
+  word-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.dashboard-hero p,
+.board-main-section-header span,
+.login-form label > span {
+  color: var(--bh-app-muted);
+}
+
+.hero-eyebrow,
+.board-main-section-header button,
+.board-section-add,
+.board-card-glass p,
+.board-card-glass span {
+  letter-spacing: .075em;
+}
+
+.btn-primary,
+.btn-ghost,
+.field,
+.app-select,
+.context-menu,
+.move-dialog,
+.confirm-card,
+.pin-detail-card,
+.side-glass,
+.board-main-section,
+.board-gallery-card,
+.pin-card,
+.pin-visual {
+  font-family: var(--app-font-body);
+}
+
+.field,
+.btn-ghost,
+.btn-primary,
+.app-select,
+.view-mode-switch,
+.context-menu,
+.move-dialog,
+.pin-detail-card,
+.confirm-card {
+  border-color: rgba(255,255,255,.105) !important;
+}
+
+.btn-ghost,
+.field,
+.app-select {
+  background: rgba(255,255,255,.035) !important;
+}
+
+.btn-primary {
+  background: rgba(244,241,232,.92) !important;
+  color: #020607 !important;
+  border-color: rgba(255,255,255,.72) !important;
+  box-shadow: 0 16px 38px rgba(0,0,0,.26) !important;
+}
+
+.board-card-glass h2,
+.pin-title {
+  text-shadow: 0 2px 2px rgba(0,0,0,.24), 0 10px 26px rgba(0,0,0,.38), 0 0 18px rgba(245,250,245,.08);
+}
+
+@keyframes bhFogDriftApp {
+  0%, 100% { transform: translate(0,0); }
+  50% { transform: translate(-10px,4px); }
+}
+
+@media (max-width: 767px) {
+  .top-glass,
+  .login-panel {
+    -webkit-backdrop-filter: blur(24px) saturate(1.35) contrast(1.22) brightness(0.84) !important;
+    backdrop-filter: blur(24px) saturate(1.35) contrast(1.22) brightness(0.84) !important;
+  }
+
+  .login-panel {
+    border-radius: 9px;
+    padding: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-screen::before {
+    animation: none !important;
+  }
+}
