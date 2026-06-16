@@ -247,7 +247,7 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
 
   return (
     <div className="modal-backdrop z-50 p-3 md:p-5" role="dialog" aria-modal="true">
-      <div className="mx-auto my-auto flex max-h-[92dvh] w-full max-w-5xl flex-col overflow-hidden rounded-[10px] border border-[var(--line-strong)] bg-[var(--panel-strong)] shadow-2xl">
+      <div className="editor-glass-panel mx-auto my-auto flex max-h-[92dvh] w-full max-w-5xl flex-col overflow-hidden rounded-[9px] border border-[var(--line-strong)] shadow-2xl">
         <header className="flex items-center justify-between border-b border-[var(--line)] px-5 py-4">
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.34em] text-[var(--accent)]">{existingPin ? 'Pin bearbeiten' : 'Pin hinzufügen'}</p>
