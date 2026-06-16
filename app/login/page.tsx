@@ -8,12 +8,14 @@ export default async function LoginPage() {
   if (data.user) redirect('/boards');
 
   return (
-    <main className="grid min-h-dvh place-items-center px-5 py-10">
-      <section className="glass w-full max-w-[440px] rounded-[12px] p-6 md:p-8">
-        <div className="mb-8">
-          <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.32em] text-[var(--accent)]">Pinboard</p>
-          <h1 className="text-3xl font-semibold tracking-[-0.06em]">Visuelle Sammlung für alles, was bleiben soll.</h1>
-          <p className="mt-3 text-sm leading-6 text-[var(--muted)]">Melde dich mit E-Mail und Passwort an. Deine Pins, Medien und Dateien bleiben privat und synchronisiert.</p>
+    <main className="login-screen">
+      <div className="login-bg-svg" aria-hidden="true" />
+      <section className="login-panel" aria-label="Pinboard Login">
+        <div className="login-logo-orbit" aria-hidden="true"><span /></div>
+        <div className="login-copy">
+          <p>Pinboard</p>
+          <h1>Welcome back!</h1>
+          <span>Melde dich an und öffne deine visuellen Sammlungen, Boards und gespeicherten Inspirationen.</span>
         </div>
         <LoginForm />
       </section>

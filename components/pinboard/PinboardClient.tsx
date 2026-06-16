@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   closestCorners,
   rectIntersection,
@@ -20,7 +20,7 @@ import {
   useSensors
 } from '@dnd-kit/core';
 import { rectSortingStrategy, SortableContext, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, ChevronRight, Filter, Grid2X2, Layers3, List, ListTree, LogOut, Moon, Plus, RotateCcw, Search, Settings, SlidersHorizontal, Sun, Trash2, UploadCloud, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, ChevronRight, Filter, FolderInput, Grid2X2, Layers3, List, ListTree, LogOut, Moon, Plus, RotateCcw, Search, Settings, SlidersHorizontal, Sun, Trash2, UploadCloud, X } from 'lucide-react';
 import { Board, BoardSection, Pin } from '@/lib/types';
 import { createClient } from '@/lib/supabase/browser';
 import { nextPosition, normalizePositions } from '@/lib/position';
@@ -38,6 +38,7 @@ type UndoState = { pins: Pin[]; sections?: BoardSection[]; label: string } | nul
 type DisplayGroup = { id: string | null; title: string; description?: string | null; color?: string | null; collapsed?: boolean; pins: Pin[]; isInbox?: boolean };
 type PinContext = null | { pin: Pin; x: number; y: number };
 type SectionContext = null | { group: DisplayGroup; x: number; y: number };
+type PinMoveState = null | { pin: Pin };
 type ConfirmState = null | { title: string; message: string; confirmLabel?: string; onConfirm: () => void };
 type ViewMode = 'detailed' | 'standard' | 'compact';
 
@@ -63,6 +64,41 @@ function SectionNavItem({ group, active, onContext }: { group: DisplayGroup; act
 
 function ViewModeButton({ active, icon, label, onClick }: { active: boolean; icon: ReactNode; label: string; onClick: () => void }) {
   return <button type="button" onClick={onClick} className={`view-mode-button ${active ? 'active' : ''}`}>{icon}<span>{label}</span></button>;
+}
+
+
+function PinMoveDialog({ pin, groups, currentSectionId, onMove, onClose }: {
+  pin: Pin;
+  groups: DisplayGroup[];
+  currentSectionId: string | null;
+  onMove: (sectionId: string | null) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="modal-backdrop z-[78]" onMouseDown={onClose} role="dialog" aria-modal="true">
+      <article className="move-dialog" onMouseDown={event => event.stopPropagation()}>
+        <button type="button" onClick={onClose} className="move-dialog-close" aria-label="Schließen"><X size={16} /></button>
+        <p>Pin verschieben</p>
+        <h2>{pin.title || pin.file_name || 'Unbenannter Pin'}</h2>
+        <div className="move-target-columns move-target-columns-single">
+          <section>
+            <h3>Teilbereich wählen</h3>
+            {groups.map(group => {
+              const targetId = group.id ?? null;
+              const active = (currentSectionId ?? null) === targetId;
+              return (
+                <button key={group.id ?? 'inbox'} type="button" disabled={active} className={active ? 'active' : ''} onClick={() => onMove(targetId)}>
+                  <FolderInput size={14} />
+                  <span>{group.title}</span>
+                  {active && <em>Aktuell</em>}
+                </button>
+              );
+            })}
+          </section>
+        </div>
+      </article>
+    </div>
+  );
 }
 
 function BoardSectionPanel({ group, onAdd, onToggle, onRename, onContext, activeTarget, children }: {
@@ -174,13 +210,20 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
   const [playing, setPlaying] = useState<Pin | null>(null);
   const [detailPin, setDetailPin] = useState<Pin | null>(null);
   const [pinContext, setPinContext] = useState<PinContext>(null);
+  const [movePin, setMovePin] = useState<PinMoveState>(null);
   const [sectionContext, setSectionContext] = useState<SectionContext>(null);
   const [confirm, setConfirm] = useState<ConfirmState>(null);
   const [draggingOver, setDraggingOver] = useState(false);
   const [overSectionId, setOverSectionId] = useState<string | null | 'inbox'>(null);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const searchRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
+
+  useEffect(() => {
+    const stored = localStorage.getItem('pinboard-theme') === 'light' ? 'light' : 'dark';
+    setTheme(stored);
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 7 } }),
@@ -348,6 +391,15 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
     if (data) setPins(current => [data as Pin, ...current]);
   }
 
+  async function movePinToSection(pin: Pin, sectionId: string | null) {
+    setMovePin(null);
+    setUndo({ pins, label: 'Pin verschoben' });
+    const scopePins = pins.filter(item => item.id !== pin.id && (item.section_id ?? null) === (sectionId ?? null) && !item.archived_at && !item.deleted_at);
+    const position = nextPosition(scopePins);
+    setPins(current => current.map(item => item.id === pin.id ? { ...item, section_id: sectionId, position } : item));
+    await supabase.from('pins').update({ section_id: sectionId, position }).eq('id', pin.id);
+  }
+
   async function undoLast() {
     if (!undo) return;
     const previousPins = undo.pins;
@@ -419,9 +471,10 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
   }
 
   function toggleTheme() {
-    const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', current);
-    localStorage.setItem('pinboard-theme', current);
+    const next = theme === 'light' ? 'dark' : 'light';
+    setTheme(next);
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('pinboard-theme', next);
   }
 
   function extractUrlFromDrop(event: React.DragEvent) {
@@ -468,7 +521,7 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
             <button onClick={addSection} className="btn-ghost px-3 py-2 text-sm"><Plus size={15} /> Bereich</button>
             <button onClick={sortSectionsAlphabetically} className="btn-ghost px-3 py-2 text-sm">A-Z</button>
           </div>
-          <div className="mt-auto space-y-2 pt-4"><button onClick={toggleTheme} className="btn-ghost w-full justify-start px-3 py-2 text-sm"><Moon size={15} /><Sun size={15} className="opacity-50" /> Theme</button><button onClick={signOut} className="btn-ghost w-full justify-start px-3 py-2 text-sm"><LogOut size={15} /> {userEmail}</button></div>
+          <div className="mt-auto space-y-2 pt-4"><button onClick={toggleTheme} className="btn-ghost w-full justify-start px-3 py-2 text-sm" aria-label={theme === 'dark' ? 'Zum hellen Modus wechseln' : 'Zum dunklen Modus wechseln'}>{theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />} {theme === 'dark' ? 'Hellmodus' : 'Dunkelmodus'}</button><button onClick={signOut} className="btn-ghost w-full justify-start px-3 py-2 text-sm"><LogOut size={15} /> {userEmail}</button></div>
         </div>
       </aside>
 
@@ -559,11 +612,12 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
       {pinContext && <ContextMenu x={pinContext.x} y={pinContext.y} onClose={() => setPinContext(null)} items={[
         { label: 'Öffnen', icon: pinMenuIcons.open, onSelect: () => setDetailPin(pinContext.pin) },
         { label: 'Bearbeiten', icon: pinMenuIcons.edit, onSelect: () => setEditor({ pin: pinContext.pin, sectionId: pinContext.pin.section_id }) },
-        { label: 'Verschieben', icon: pinMenuIcons.move, onSelect: () => searchRef.current?.focus() },
+        { label: 'Verschieben', icon: pinMenuIcons.move, onSelect: () => setMovePin({ pin: pinContext.pin }) },
         { label: 'Duplizieren', icon: pinMenuIcons.duplicate, onSelect: () => duplicatePin(pinContext.pin) },
         { label: 'Archivieren', icon: pinMenuIcons.archive, onSelect: () => archivePin(pinContext.pin) },
         { label: 'Löschen', icon: pinMenuIcons.delete, danger: true, onSelect: () => requestDeletePin(pinContext.pin) }
       ]} />}
+      {movePin && <PinMoveDialog pin={movePin.pin} groups={groups} currentSectionId={movePin.pin.section_id ?? null} onClose={() => setMovePin(null)} onMove={(sectionId) => movePinToSection(movePin.pin, sectionId)} />}
       {sectionContext && <ContextMenu x={sectionContext.x} y={sectionContext.y} onClose={() => setSectionContext(null)} items={[
         { label: 'Anzeigen', icon: Filter, onSelect: () => { setViewMode('detailed'); setSectionFilter(sectionContext.group.id ?? 'inbox'); } },
         { label: 'Umbenennen', icon: Settings, disabled: !sectionContext.group.id, onSelect: () => requestRenameSection(sectionContext.group) },
