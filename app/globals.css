@@ -2374,3 +2374,544 @@ textarea {
     backdrop-filter: blur(24px) saturate(1.36) contrast(1.14) brightness(0.94) !important;
   }
 }
+
+/* ==========================================================
+   QA GLASS + VIEWPORT CORRECTION
+   Final override pass: real transparent Broken-Horizon/Apple glass,
+   clamped overlays, robust light-mode contrast.
+   ========================================================== */
+:root {
+  --z-header: 100;
+  --z-dropdown: 300;
+  --z-context-menu: 520;
+  --z-modal-backdrop: 700;
+  --z-modal: 820;
+  --z-confirm: 920;
+  --z-drag-overlay: 1040;
+
+  --qa-glass-bg:
+    linear-gradient(135deg,
+      rgba(255,255,255,0.070) 0%,
+      rgba(255,255,255,0.026) 22%,
+      rgba(18,20,23,0.30) 56%,
+      rgba(4,6,8,0.44) 100%
+    );
+  --qa-glass-bg-strong:
+    linear-gradient(135deg,
+      rgba(255,255,255,0.080) 0%,
+      rgba(255,255,255,0.032) 24%,
+      rgba(18,20,23,0.34) 58%,
+      rgba(4,6,8,0.50) 100%
+    );
+  --qa-glass-line: rgba(255,255,255,0.145);
+  --qa-glass-line-soft: rgba(255,255,255,0.080);
+  --qa-glass-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.13),
+    inset 0 -1px 0 rgba(255,255,255,0.070),
+    inset 0 -2px 0 rgba(0,0,0,0.40),
+    inset 0 -18px 34px rgba(0,0,0,0.16),
+    0 18px 54px rgba(0,0,0,0.34);
+  --qa-glass-shadow-strong:
+    inset 0 1px 0 rgba(255,255,255,0.16),
+    inset 0 -1px 0 rgba(255,255,255,0.090),
+    inset 0 -2px 0 rgba(0,0,0,0.44),
+    inset 0 -20px 38px rgba(0,0,0,0.18),
+    0 34px 105px rgba(0,0,0,0.46);
+  --qa-glass-filter: blur(34px) saturate(1.55) contrast(1.28) brightness(0.88);
+  --qa-overlay-bg:
+    radial-gradient(circle at 50% 15%, rgba(255,255,255,0.055), transparent 34rem),
+    rgba(0,0,0,0.40);
+}
+
+[data-theme='light'] {
+  --qa-glass-bg:
+    linear-gradient(135deg,
+      rgba(255,255,255,0.52) 0%,
+      rgba(255,255,255,0.28) 22%,
+      rgba(248,246,240,0.38) 56%,
+      rgba(232,226,214,0.46) 100%
+    );
+  --qa-glass-bg-strong:
+    linear-gradient(135deg,
+      rgba(255,255,255,0.62) 0%,
+      rgba(255,255,255,0.36) 24%,
+      rgba(248,246,240,0.50) 58%,
+      rgba(232,226,214,0.58) 100%
+    );
+  --qa-glass-line: rgba(22,18,12,0.14);
+  --qa-glass-line-soft: rgba(22,18,12,0.08);
+  --qa-glass-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.78),
+    inset 0 -1px 0 rgba(255,255,255,0.42),
+    inset 0 -2px 0 rgba(48,38,24,0.07),
+    inset 0 -18px 34px rgba(255,255,255,0.16),
+    0 20px 58px rgba(42,34,24,0.15);
+  --qa-glass-shadow-strong:
+    inset 0 1px 0 rgba(255,255,255,0.84),
+    inset 0 -1px 0 rgba(255,255,255,0.50),
+    inset 0 -2px 0 rgba(48,38,24,0.09),
+    inset 0 -18px 38px rgba(255,255,255,0.18),
+    0 32px 96px rgba(42,34,24,0.18);
+  --qa-glass-filter: blur(32px) saturate(1.35) contrast(1.06) brightness(1.04);
+  --qa-overlay-bg:
+    radial-gradient(circle at 50% 15%, rgba(255,255,255,0.34), transparent 34rem),
+    rgba(244,241,234,0.46);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 8%, rgba(255,255,255,0.070), transparent 32rem),
+    radial-gradient(circle at 78% 0%, rgba(91,59,139,0.10), transparent 34rem),
+    linear-gradient(135deg, rgba(255,255,255,0.020), transparent 42%);
+}
+
+.login-panel,
+.top-glass,
+.context-menu,
+.move-dialog,
+.confirm-card,
+.pin-detail-card,
+.editor-glass-panel,
+.side-glass,
+.hero-control-panel,
+.clean-toolbar,
+.mobile-glass-nav,
+.board-settings-panel,
+.video-lightbox-card {
+  isolation: isolate !important;
+  overflow: hidden !important;
+  background: var(--qa-glass-bg) !important;
+  border-color: var(--qa-glass-line) !important;
+  box-shadow: var(--qa-glass-shadow) !important;
+  -webkit-backdrop-filter: var(--qa-glass-filter) !important;
+  backdrop-filter: var(--qa-glass-filter) !important;
+  transform: translate3d(0,0,0);
+  backface-visibility: hidden;
+}
+
+.login-panel,
+.context-menu,
+.move-dialog,
+.confirm-card,
+.pin-detail-card,
+.editor-glass-panel,
+.board-settings-panel,
+.video-lightbox-card {
+  background: var(--qa-glass-bg-strong) !important;
+  border: 1px solid var(--qa-glass-line) !important;
+  box-shadow: var(--qa-glass-shadow-strong) !important;
+}
+
+.top-glass {
+  z-index: var(--z-header) !important;
+  width: 100% !important;
+  border-radius: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-top: 0 !important;
+  border-bottom: 1px solid var(--qa-glass-line) !important;
+}
+
+.login-panel::before,
+.top-glass::before,
+.context-menu::before,
+.move-dialog::before,
+.confirm-card::before,
+.pin-detail-card::before,
+.editor-glass-panel::before,
+.side-glass::before,
+.hero-control-panel::before,
+.clean-toolbar::before,
+.mobile-glass-nav::before,
+.board-settings-panel::before,
+.video-lightbox-card::before,
+.login-panel::after,
+.top-glass::after,
+.context-menu::after,
+.move-dialog::after,
+.confirm-card::after,
+.pin-detail-card::after,
+.editor-glass-panel::after,
+.side-glass::after,
+.hero-control-panel::after,
+.clean-toolbar::after,
+.mobile-glass-nav::after,
+.board-settings-panel::after,
+.video-lightbox-card::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+}
+
+.login-panel::before,
+.top-glass::before,
+.context-menu::before,
+.move-dialog::before,
+.confirm-card::before,
+.pin-detail-card::before,
+.editor-glass-panel::before,
+.side-glass::before,
+.hero-control-panel::before,
+.clean-toolbar::before,
+.mobile-glass-nav::before,
+.board-settings-panel::before,
+.video-lightbox-card::before {
+  background:
+    linear-gradient(to bottom, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0.040) 1px, transparent 20px),
+    radial-gradient(circle at 18% 0%, rgba(255,255,255,0.135) 0%, rgba(255,255,255,0.048) 20%, transparent 50%) !important;
+  opacity: 0.36 !important;
+}
+
+.login-panel::after,
+.top-glass::after,
+.context-menu::after,
+.move-dialog::after,
+.confirm-card::after,
+.pin-detail-card::after,
+.editor-glass-panel::after,
+.side-glass::after,
+.hero-control-panel::after,
+.clean-toolbar::after,
+.mobile-glass-nav::after,
+.board-settings-panel::after,
+.video-lightbox-card::after {
+  background:
+    linear-gradient(to bottom, transparent 0%, transparent calc(100% - 14px), rgba(255,255,255,0.060) calc(100% - 5px), rgba(255,255,255,0.135) 100%),
+    linear-gradient(to bottom, rgba(255,255,255,0.014) 0%, transparent 30%, rgba(0,0,0,0.18) 100%) !important;
+  opacity: 0.30 !important;
+}
+
+.login-panel > *,
+.top-glass > *,
+.context-menu > *,
+.move-dialog > *,
+.confirm-card > *,
+.pin-detail-card > *,
+.editor-glass-panel > *,
+.side-glass > *,
+.hero-control-panel > *,
+.clean-toolbar > *,
+.mobile-glass-nav > *,
+.board-settings-panel > *,
+.video-lightbox-card > * {
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+.modal-backdrop {
+  z-index: var(--z-modal-backdrop) !important;
+  padding: clamp(12px, 3vw, 34px) !important;
+  overflow: hidden !important;
+  background: var(--qa-overlay-bg) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(1.34) contrast(1.10) brightness(0.76) !important;
+  backdrop-filter: blur(24px) saturate(1.34) contrast(1.10) brightness(0.76) !important;
+}
+
+.context-menu {
+  z-index: var(--z-context-menu) !important;
+  position: fixed !important;
+  width: min(236px, calc(100vw - 24px)) !important;
+  max-height: calc(100dvh - 24px) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain;
+  border-radius: 9px !important;
+}
+
+.context-menu button {
+  color: var(--text-soft) !important;
+  white-space: nowrap !important;
+}
+.context-menu button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pin-detail-card,
+.editor-glass-panel,
+.move-dialog,
+.confirm-card {
+  z-index: var(--z-modal) !important;
+  max-width: calc(100vw - 28px) !important;
+  max-height: calc(100dvh - 28px) !important;
+  overflow: hidden !important;
+}
+
+.confirm-card { z-index: var(--z-confirm) !important; }
+
+.pin-detail-card {
+  width: min(1080px, 66vw) !important;
+  min-width: min(92vw, 760px);
+}
+.pin-detail-card > .grid {
+  max-height: calc(100dvh - 28px) !important;
+  overflow: hidden !important;
+}
+.detail-media {
+  min-height: 0 !important;
+  height: min(62dvh, 560px) !important;
+  background: transparent !important;
+}
+.detail-media img {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: min(62dvh, 560px) !important;
+  object-fit: cover !important;
+}
+.detail-content {
+  max-height: calc(100dvh - 28px) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  background: transparent !important;
+}
+.detail-description,
+.detail-note p {
+  max-height: 28dvh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: .4rem;
+  word-break: break-word;
+}
+.detail-links a,
+.detail-meta span,
+.detail-tags span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.detail-links em {
+  white-space: nowrap;
+}
+
+.editor-glass-panel {
+  width: min(1100px, calc(100vw - 28px)) !important;
+}
+.editor-glass-panel form {
+  overflow-x: hidden !important;
+}
+.editor-glass-panel aside,
+.editor-glass-panel main,
+.editor-glass-panel header,
+.detail-note,
+.detail-meta span,
+.detail-tags span,
+.detail-links a,
+.move-target-columns button,
+.login-mode-tabs,
+.login-form input[type='email'],
+.login-password-field,
+.login-message,
+.google-login-button,
+.field,
+.app-select,
+.btn-ghost,
+.detail-close,
+.confirm-close,
+.move-dialog-close,
+.board-card-menu,
+.pin-action,
+.section-icon-button,
+.view-mode-button,
+.top-back-link {
+  background: rgba(255,255,255,0.045) !important;
+  border-color: var(--qa-glass-line-soft) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.35) !important;
+  backdrop-filter: blur(18px) saturate(1.35) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.065) !important;
+}
+
+.login-screen {
+  background:
+    linear-gradient(90deg, rgba(2,6,7,0.12) 0%, rgba(2,6,7,0.28) 48%, rgba(2,6,7,0.78) 100%),
+    radial-gradient(circle at 78% 12%, rgba(91,59,139,0.24), transparent 34rem),
+    radial-gradient(ellipse at 34% 76%, rgba(245,245,245,0.12), transparent 30rem),
+    #020607 !important;
+}
+.login-bg-svg {
+  opacity: .92 !important;
+  filter: saturate(1.05) contrast(1.03);
+}
+.login-panel {
+  width: min(92vw, 570px) !important;
+  color: rgba(244,241,232,0.94) !important;
+  background: var(--qa-glass-bg-strong) !important;
+}
+.login-panel .login-copy h1 { color: rgba(244,241,232,0.96) !important; }
+.login-panel .login-copy p,
+.login-panel .login-copy span,
+.login-panel label > span,
+.login-panel .login-row,
+.login-panel .login-link { color: rgba(244,241,232,0.66) !important; }
+.login-panel input,
+.login-password-field input { color: rgba(244,241,232,0.94) !important; }
+.login-panel input::placeholder { color: rgba(244,241,232,0.40) !important; }
+.login-primary-button {
+  background: rgba(244,241,232,0.90) !important;
+  color: #020607 !important;
+  border-color: rgba(255,255,255,0.30) !important;
+}
+.google-login-button { color: rgba(244,241,232,0.88) !important; }
+.google-login-button strong { color: #020607 !important; }
+
+[data-theme='light'] body,
+[data-theme='light'] .app-shell,
+[data-theme='light'] .award-grid-bg,
+[data-theme='light'] main,
+[data-theme='light'] section,
+[data-theme='light'] article {
+  color: #171512;
+}
+[data-theme='light'] .top-glass,
+[data-theme='light'] .context-menu,
+[data-theme='light'] .move-dialog,
+[data-theme='light'] .confirm-card,
+[data-theme='light'] .pin-detail-card,
+[data-theme='light'] .editor-glass-panel,
+[data-theme='light'] .side-glass,
+[data-theme='light'] .hero-control-panel,
+[data-theme='light'] .clean-toolbar,
+[data-theme='light'] .mobile-glass-nav,
+[data-theme='light'] .board-settings-panel {
+  color: #171512 !important;
+}
+[data-theme='light'] h1,
+[data-theme='light'] h2,
+[data-theme='light'] h3,
+[data-theme='light'] h4,
+[data-theme='light'] label,
+[data-theme='light'] .top-glass h2,
+[data-theme='light'] .dashboard-hero h1,
+[data-theme='light'] .detail-content h2,
+[data-theme='light'] .confirm-card h2,
+[data-theme='light'] .move-dialog h2,
+[data-theme='light'] .editor-glass-panel h2,
+[data-theme='light'] .context-menu button,
+[data-theme='light'] .field,
+[data-theme='light'] .app-select,
+[data-theme='light'] input,
+[data-theme='light'] textarea,
+[data-theme='light'] select {
+  color: #171512 !important;
+  text-shadow: none !important;
+}
+[data-theme='light'] p,
+[data-theme='light'] span,
+[data-theme='light'] small,
+[data-theme='light'] em,
+[data-theme='light'] .detail-description,
+[data-theme='light'] .detail-kicker,
+[data-theme='light'] .detail-meta,
+[data-theme='light'] .detail-note strong,
+[data-theme='light'] .detail-note p,
+[data-theme='light'] .move-dialog > p,
+[data-theme='light'] .confirm-card p,
+[data-theme='light'] .text-\[var\(--text-soft\)\],
+[data-theme='light'] .text-\[var\(--muted\)\] {
+  color: #4a433b !important;
+}
+[data-theme='light'] .field,
+[data-theme='light'] .app-select,
+[data-theme='light'] .detail-note,
+[data-theme='light'] .detail-meta span,
+[data-theme='light'] .detail-tags span,
+[data-theme='light'] .detail-links a,
+[data-theme='light'] .move-target-columns button,
+[data-theme='light'] .btn-ghost,
+[data-theme='light'] .top-back-link,
+[data-theme='light'] .view-mode-button,
+[data-theme='light'] .section-icon-button,
+[data-theme='light'] .pin-action,
+[data-theme='light'] .login-form input[type='email'],
+[data-theme='light'] .login-password-field {
+  color: #28231e !important;
+  background: rgba(255,255,255,0.42) !important;
+  border-color: rgba(28,22,14,0.13) !important;
+}
+[data-theme='light'] input::placeholder,
+[data-theme='light'] textarea::placeholder { color: rgba(40,35,30,0.42) !important; }
+[data-theme='light'] .btn-primary,
+[data-theme='light'] .login-primary-button {
+  color: #f7f2e8 !important;
+  background: rgba(24,22,19,0.92) !important;
+  border-color: rgba(24,22,19,0.16) !important;
+}
+[data-theme='light'] .board-card-glass,
+[data-theme='light'] .board-card-glass h2,
+[data-theme='light'] .board-card-glass p,
+[data-theme='light'] .board-card-glass span,
+[data-theme='light'] .pin-content-glass,
+[data-theme='light'] .pin-content-glass h3,
+[data-theme='light'] .pin-content-glass p,
+[data-theme='light'] .pin-content-glass span,
+[data-theme='light'] .pin-title,
+[data-theme='light'] .detail-close,
+[data-theme='light'] .pin-action {
+  color: rgba(255,255,255,0.94) !important;
+  text-shadow: 0 2px 3px rgba(0,0,0,0.45), 0 12px 28px rgba(0,0,0,0.50) !important;
+}
+
+@media (max-width: 1024px) {
+  .pin-detail-card {
+    width: min(94vw, 920px) !important;
+    min-width: 0 !important;
+  }
+}
+@media (max-width: 767px) {
+  .login-panel,
+  .top-glass,
+  .context-menu,
+  .move-dialog,
+  .confirm-card,
+  .pin-detail-card,
+  .editor-glass-panel,
+  .side-glass,
+  .hero-control-panel,
+  .clean-toolbar,
+  .mobile-glass-nav {
+    -webkit-backdrop-filter: blur(24px) saturate(1.38) contrast(1.16) brightness(0.92) !important;
+    backdrop-filter: blur(24px) saturate(1.38) contrast(1.16) brightness(0.92) !important;
+  }
+  .pin-detail-card {
+    width: calc(100vw - 20px) !important;
+    min-width: 0 !important;
+  }
+  .pin-detail-card > .grid { display: block !important; }
+  .detail-media { height: min(42dvh, 360px) !important; }
+  .detail-content { max-height: calc(58dvh - 20px) !important; padding: 1.1rem !important; }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .login-panel,
+  .top-glass,
+  .context-menu,
+  .move-dialog,
+  .confirm-card,
+  .pin-detail-card,
+  .editor-glass-panel,
+  .side-glass,
+  .hero-control-panel,
+  .clean-toolbar,
+  .mobile-glass-nav {
+    background: rgba(10,12,13,0.86) !important;
+  }
+  [data-theme='light'] .login-panel,
+  [data-theme='light'] .top-glass,
+  [data-theme='light'] .context-menu,
+  [data-theme='light'] .move-dialog,
+  [data-theme='light'] .confirm-card,
+  [data-theme='light'] .pin-detail-card,
+  [data-theme='light'] .editor-glass-panel,
+  [data-theme='light'] .side-glass,
+  [data-theme='light'] .hero-control-panel,
+  [data-theme='light'] .clean-toolbar,
+  [data-theme='light'] .mobile-glass-nav {
+    background: rgba(250,248,242,0.92) !important;
+  }
+}
