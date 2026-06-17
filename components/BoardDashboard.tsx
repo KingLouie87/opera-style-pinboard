@@ -287,13 +287,13 @@ export function BoardDashboard({ boards: initialBoards, userEmail }: Props) {
         </div>
         <div className="hero-control-panel hero-control-panel-inline clean-toolbar">
           <label className="field hero-search"><Search size={16} className="text-[var(--muted)]" /><input ref={searchRef} value={query} onChange={event => setQuery(event.target.value)} placeholder="Boards durchsuchen" /></label>
-          <button onClick={() => createBoard()} disabled={creating} className="btn-primary h-11 px-4 text-sm"><Plus size={17} /> {creating ? 'Erstelle ...' : 'Board'}</button>
           <select value={sort} onChange={event => setSort(event.target.value as BoardSort)} className="field app-select board-sort-select">
             <option value="manual">Manuell</option>
             <option value="alpha">Alphabetisch</option>
             <option value="newest">Neueste</option>
             <option value="updated">Aktualisiert</option>
           </select>
+          <button onClick={() => createBoard()} disabled={creating} className="btn-primary board-create-button h-11 px-4 text-sm"><Plus size={17} /> {creating ? 'Erstelle ...' : 'Board'}</button>
           <button type="button" onClick={addGroup} className="btn-ghost h-11 px-3 text-sm"><Plus size={16} /> Bereich</button>
         </div>
       </section>

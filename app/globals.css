@@ -4141,3 +4141,277 @@ body {
     font-size: clamp(3rem, 14vw, 5.8rem) !important;
   }
 }
+
+/* ==========================================================
+   TARGETED PATCH 2: board header order/glass, sticky main header,
+   modal image treatment and 2560px dashboard distribution.
+   Only requested areas.
+   ========================================================== */
+:root {
+  --dashboard-edge-gap: clamp(28px, 1.5vw, 42px);
+  --dashboard-hero-gap: 75px;
+}
+
+/* Main header stays fixed/sticky so the existing glass effect is visible while scrolling. */
+.dashboard-topbar {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: var(--z-header) !important;
+  width: 100vw !important;
+  max-width: 100vw !important;
+  margin: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+}
+
+/* Board header uses the exact same glass language as the dashboard header and keeps the title left. */
+.board-detail-shell .top-glass {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: var(--z-header) !important;
+  width: 100vw !important;
+  max-width: 100vw !important;
+  background: var(--glass-bg) !important;
+  border-bottom: 1px solid var(--glass-border) !important;
+  box-shadow: var(--glass-shadow) !important;
+  -webkit-backdrop-filter: var(--glass-filter) !important;
+  backdrop-filter: var(--glass-filter) !important;
+  min-height: var(--board-header-height) !important;
+  isolation: isolate !important;
+}
+
+.board-detail-shell .top-glass > div {
+  align-items: center !important;
+}
+
+.board-header-title-wrap {
+  justify-content: flex-start !important;
+  text-align: left !important;
+}
+
+.board-header-title {
+  display: block !important;
+  margin: 0 !important;
+  color: var(--text) !important;
+  font-size: clamp(0.98rem, 0.8vw, 1.18rem) !important;
+  line-height: 1.1 !important;
+  letter-spacing: -0.035em !important;
+  font-weight: 760 !important;
+}
+
+.board-header-meta {
+  color: var(--muted) !important;
+  font-size: 0.72rem !important;
+  line-height: 1 !important;
+  letter-spacing: 0.18em !important;
+}
+
+/* Dashboard width: use full viewport with equal left/right edge gap and no frame around boards. */
+.dashboard-shell {
+  width: 100vw !important;
+  max-width: none !important;
+}
+
+.dashboard-hero {
+  width: 100% !important;
+  max-width: none !important;
+  margin: var(--dashboard-hero-gap) 0 var(--dashboard-hero-gap) !important;
+  padding-left: var(--dashboard-edge-gap) !important;
+  padding-right: var(--dashboard-edge-gap) !important;
+  grid-template-columns: minmax(0, 1fr) max-content !important;
+  align-items: end !important;
+  gap: clamp(28px, 3vw, 72px) !important;
+}
+
+.dashboard-hero > div:first-child {
+  align-self: start !important;
+}
+
+.dashboard-hero h1 {
+  font-size: clamp(3.4rem, 6.4vw, 7.6rem) !important;
+  line-height: 0.9 !important;
+  letter-spacing: -0.072em !important;
+  max-width: 760px !important;
+}
+
+.dashboard-hero p {
+  margin-top: clamp(14px, 1.2vw, 22px) !important;
+  max-width: 660px !important;
+}
+
+.hero-control-panel.clean-toolbar {
+  align-self: end !important;
+  justify-self: end !important;
+  margin-bottom: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+}
+
+.hero-control-panel.clean-toolbar .board-create-button,
+.hero-control-panel.clean-toolbar .btn-primary,
+.hero-control-panel.clean-toolbar .btn-ghost,
+.hero-control-panel.clean-toolbar .app-select,
+.hero-control-panel.clean-toolbar .field {
+  height: 44px !important;
+  min-height: 44px !important;
+  opacity: 1 !important;
+}
+
+.hero-control-panel.clean-toolbar .board-create-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  color: #020607 !important;
+  background: rgba(244,241,232,.92) !important;
+}
+
+.board-gallery-section {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding-left: var(--dashboard-edge-gap) !important;
+  padding-right: var(--dashboard-edge-gap) !important;
+  padding-bottom: 90px !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.board-section-stack-main,
+.board-main-section,
+.board-main-section::before,
+.board-main-section::after {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+}
+
+.board-main-section-header {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.board-gallery-grid {
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important;
+  gap: clamp(14px, 0.9vw, 22px) !important;
+  justify-content: stretch !important;
+  align-items: stretch !important;
+}
+
+.board-gallery-card,
+.board-add-tile {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+/* Detail modal: image uses full height; transition gradient is only a narrow edge fade. */
+.pin-detail-card {
+  width: min(94vw, 1180px) !important;
+  max-width: 1180px !important;
+  overflow: hidden !important;
+}
+
+.pin-detail-card .detail-close {
+  top: 14px !important;
+  right: 14px !important;
+  left: auto !important;
+  transform: none !important;
+  z-index: 40 !important;
+}
+
+.pin-detail-card .detail-grid-with-image {
+  grid-template-columns: minmax(360px, 46%) minmax(0, 1fr) !important;
+  min-height: min(660px, calc(100dvh - 48px)) !important;
+}
+
+.pin-detail-card .detail-media {
+  align-self: stretch !important;
+  height: 100% !important;
+  min-height: min(660px, calc(100dvh - 48px)) !important;
+  max-height: calc(100dvh - 48px) !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  overflow: hidden !important;
+  background: transparent !important;
+}
+
+.pin-detail-card .detail-media img {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  max-height: none !important;
+  object-fit: cover !important;
+  filter: none !important;
+  image-rendering: auto !important;
+}
+
+.pin-detail-card .detail-media::after {
+  inset: 0 0 0 auto !important;
+  width: min(150px, 28%) !important;
+  height: 100% !important;
+  background: linear-gradient(to right, rgba(2,6,7,0) 0%, rgba(2,6,7,.30) 48%, rgba(2,6,7,.78) 100%) !important;
+}
+
+.pin-detail-card .detail-content {
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.pin-detail-card-no-image,
+.pin-detail-card-no-image .detail-grid,
+.pin-detail-card-no-image .detail-grid-no-image {
+  background: var(--glass-bg) !important;
+}
+
+.pin-detail-card-no-image .detail-grid,
+.pin-detail-card-no-image .detail-grid-no-image {
+  min-height: min(560px, calc(100dvh - 48px)) !important;
+}
+
+.pin-detail-card-no-image .detail-content {
+  padding-left: clamp(34px, 4vw, 58px) !important;
+  padding-right: clamp(34px, 4vw, 58px) !important;
+}
+
+@media (min-width: 1800px) {
+  .board-gallery-grid {
+    grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)) !important;
+  }
+}
+
+@media (max-width: 1180px) {
+  .dashboard-hero {
+    grid-template-columns: 1fr !important;
+    margin-top: clamp(34px, 7vw, 72px) !important;
+    margin-bottom: clamp(34px, 7vw, 72px) !important;
+  }
+
+  .hero-control-panel.clean-toolbar {
+    justify-self: start !important;
+    justify-content: flex-start !important;
+  }
+}
+
+@media (max-width: 860px) {
+  .pin-detail-card .detail-grid-with-image {
+    display: block !important;
+  }
+  .pin-detail-card .detail-media {
+    height: 38dvh !important;
+    min-height: 240px !important;
+    max-height: 420px !important;
+  }
+  .pin-detail-card .detail-media::after {
+    inset: auto 0 0 0 !important;
+    width: 100% !important;
+    height: 90px !important;
+    background: linear-gradient(to bottom, rgba(2,6,7,0), rgba(2,6,7,.72)) !important;
+  }
+}
