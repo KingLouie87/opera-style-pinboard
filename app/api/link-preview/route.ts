@@ -133,6 +133,43 @@ export async function POST(request: Request) {
       const message = response.status === 403
         ? 'Die Website blockiert automatische Vorschauen mit 403. Manuelles Speichern bleibt möglich'
         : `Website konnte nicht vollständig geladen werden (${response.status}). Manuelles Speichern bleibt möglich`;
+
+      // Some protected sites still return a readable HTML error page that contains
+      // a useful title, canonical URL or image metadata. Parse that body before
+      // falling back to a plain domain-only pin so difficult URLs still feel useful.
+      if (contentType.includes('text/html') || contentType.includes('application/xhtml')) {
+        try {
+          const html = await response.clone().text();
+          const $ = cheerio.load(html);
+          const title = $('meta[property="og:title"]').attr('content') || $('meta[name="twitter:title"]').attr('content') || $('title').first().text() || niceTitleFromUrl(target);
+          const description = $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || $('meta[name="twitter:description"]').attr('content') || null;
+          const images: string[] = [];
+          const push = (value: string | undefined | null) => {
+            const absolute = absoluteUrl(value, target);
+            if (absolute && looksUseful(absolute) && !images.includes(absolute)) images.push(absolute);
+          };
+          push($('meta[property="og:image:secure_url"]').attr('content'));
+          push($('meta[property="og:image"]').attr('content'));
+          push($('meta[name="twitter:image"]').attr('content'));
+          push($('link[rel="image_src"]').attr('href'));
+          const favicon = absoluteUrl($('link[rel="apple-touch-icon"]').attr('href'), target) || absoluteUrl($('link[rel="icon"]').attr('href'), target) || absoluteUrl('/favicon.ico', target);
+          return NextResponse.json({
+            url: target.toString(),
+            title: title?.trim() || niceTitleFromUrl(target),
+            description: description?.trim() || message,
+            favicon,
+            source: sourceName(target),
+            mediaKind: youtubeEmbed(target.toString()) ? 'video' : inferMediaKind(target.toString(), contentType, null),
+            contentType,
+            suggestedTags: autoTags(`${title ?? ''} ${description ?? ''} ${sourceName(target)} ${target.pathname}`).slice(0, 7),
+            images: images.slice(0, 20),
+            videoEmbedUrl: youtubeEmbed(target.toString()),
+            previewWarning: message
+          });
+        } catch {
+          // fall through to domain fallback
+        }
+      }
       return previewFallback(target, message, contentType);
     }
 
