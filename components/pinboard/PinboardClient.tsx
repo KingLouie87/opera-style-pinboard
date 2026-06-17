@@ -503,7 +503,7 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
   }
 
   return (
-    <main className="app-shell flex h-dvh overflow-hidden">
+    <main className="app-shell board-detail-shell flex h-dvh overflow-hidden">
       <aside className="hidden w-[286px] shrink-0 p-4 lg:flex lg:flex-col">
         <div className="side-glass flex min-h-0 flex-1 flex-col">
           <Link href="/boards" className="top-back-link mb-3"><ArrowLeft size={16} /> Alle Boards</Link>

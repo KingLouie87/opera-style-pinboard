@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { CalendarDays, Download, ExternalLink, FileText, Play, X } from 'lucide-react';
+import { CalendarDays, Download, ExternalLink, Play, X } from 'lucide-react';
 import { formatBytes, youtubeEmbed } from '@/lib/media';
 import { Pin } from '@/lib/types';
 
@@ -15,15 +15,19 @@ export function PinDetailModal({ pin, onClose, onEdit, onPlay }: { pin: Pin; onC
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  const hasImage = Boolean(pin.image_url);
+
   return (
     <div className="modal-backdrop z-[70]" onMouseDown={onClose} role="dialog" aria-modal="true">
-      <article className="pin-detail-card" onMouseDown={event => event.stopPropagation()} style={{ '--pin-accent': pin.color || pin.dominant_color || '#858585' } as React.CSSProperties}>
+      <article className={`pin-detail-card ${hasImage ? 'pin-detail-card-with-image' : 'pin-detail-card-no-image'}`} onMouseDown={event => event.stopPropagation()} style={{ '--pin-accent': pin.color || pin.dominant_color || '#858585' } as React.CSSProperties}>
         <button type="button" onClick={onClose} className="detail-close" aria-label="Schließen"><X size={18} /></button>
-        <div className="grid min-h-0 gap-0 lg:grid-cols-[minmax(320px,46%)_1fr]">
-          <div className="detail-media">
-            {pin.image_url ? <img src={pin.image_url} alt="" /> : <div className="detail-placeholder"><FileText size={36} /> Kein Cover</div>}
-            {isVideo && <button type="button" onClick={() => onPlay?.(pin)} className="detail-play"><Play size={21} fill="currentColor" /> Video abspielen</button>}
-          </div>
+        <div className={`detail-grid min-h-0 ${hasImage ? 'detail-grid-with-image' : 'detail-grid-no-image'}`}>
+          {hasImage && (
+            <div className="detail-media">
+              <img src={pin.image_url!} alt="" />
+              {isVideo && <button type="button" onClick={() => onPlay?.(pin)} className="detail-play"><Play size={21} fill="currentColor" /> Video abspielen</button>}
+            </div>
+          )}
           <div className="detail-content board-scroll">
             <p className="detail-kicker">{pin.source || pin.media_kind || 'Pinboard'}</p>
             <h2>{pin.title || 'Unbenannter Pin'}</h2>

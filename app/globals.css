@@ -3907,3 +3907,237 @@ h1, h2, h3, .dashboard-hero h1, .top-glass h2, .login-copy h1, .board-gallery-ca
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; scroll-behavior: auto !important; }
 }
+
+/* ==========================================================
+   TARGETED PATCH: full-width board header, modal media edge,
+   title scale and viewport use. Only requested areas.
+   ========================================================== */
+:root {
+  --board-sidebar-width: 286px;
+  --board-header-height: 76px;
+}
+
+html,
+body {
+  width: 100% !important;
+  max-width: none !important;
+  overflow-x: hidden !important;
+}
+
+.app-shell,
+.dashboard-shell,
+.board-detail-shell {
+  width: 100vw !important;
+  max-width: none !important;
+  overflow-x: hidden !important;
+}
+
+.dashboard-topbar,
+.top-glass {
+  background: var(--glass-bg) !important;
+  border-top: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-bottom: 1px solid var(--glass-border) !important;
+  box-shadow: var(--glass-shadow) !important;
+  -webkit-backdrop-filter: var(--glass-filter) !important;
+  backdrop-filter: var(--glass-filter) !important;
+}
+
+.dashboard-topbar::before,
+.top-glass::before,
+.dashboard-topbar::after,
+.top-glass::after {
+  pointer-events: none !important;
+}
+
+.dashboard-topbar {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+.board-detail-shell > aside {
+  padding-top: calc(var(--board-header-height) + 16px) !important;
+}
+
+.board-detail-shell > section {
+  width: calc(100vw - var(--board-sidebar-width)) !important;
+  max-width: none !important;
+}
+
+.board-detail-shell .top-glass {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  min-height: var(--board-header-height) !important;
+  margin-left: calc(-1 * var(--board-sidebar-width)) !important;
+  padding-left: calc(var(--board-sidebar-width) + clamp(16px, 2.2vw, 34px)) !important;
+  padding-right: clamp(16px, 2.2vw, 34px) !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+  border-radius: 0 !important;
+  align-items: center !important;
+  overflow: visible !important;
+}
+
+.board-detail-shell .board-scroll {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.side-glass .top-back-link {
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  min-height: 40px !important;
+  align-items: center !important;
+}
+
+.dashboard-hero,
+.board-gallery-section {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+.dashboard-hero h1 {
+  font-size: clamp(3.6rem, 7.4vw, 8.7rem) !important;
+  line-height: .88 !important;
+  letter-spacing: -.078em !important;
+  max-width: 880px !important;
+}
+
+.pin-detail-card {
+  position: relative !important;
+  width: min(94vw, 1120px) !important;
+  max-width: 1120px !important;
+  max-height: calc(100dvh - 48px) !important;
+  overflow: hidden !important;
+}
+
+.pin-detail-card .detail-close {
+  top: 14px !important;
+  right: 14px !important;
+  left: auto !important;
+  z-index: 20 !important;
+}
+
+.pin-detail-card .detail-grid {
+  display: grid !important;
+  min-height: min(620px, calc(100dvh - 48px)) !important;
+  max-height: calc(100dvh - 48px) !important;
+  overflow: hidden !important;
+}
+
+.pin-detail-card .detail-grid-with-image {
+  grid-template-columns: minmax(320px, 46%) minmax(0, 1fr) !important;
+}
+
+.pin-detail-card .detail-grid-no-image {
+  grid-template-columns: minmax(0, 1fr) !important;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(244,241,232,.10), transparent 34%),
+    radial-gradient(circle at 78% 78%, rgba(91,59,139,.12), transparent 38%),
+    linear-gradient(135deg, rgba(255,255,255,.055), rgba(255,255,255,.018) 32%, rgba(2,6,7,.22)) !important;
+}
+
+.pin-detail-card .detail-media {
+  position: relative !important;
+  align-self: stretch !important;
+  height: auto !important;
+  min-height: 100% !important;
+  max-height: none !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  overflow: hidden !important;
+}
+
+.pin-detail-card .detail-media img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  max-height: none !important;
+  object-fit: cover !important;
+}
+
+.pin-detail-card .detail-media::after {
+  content: '' !important;
+  position: absolute !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  background:
+    linear-gradient(to right, rgba(2,6,7,0) 0%, rgba(2,6,7,.08) 48%, rgba(2,6,7,.54) 82%, rgba(2,6,7,.88) 100%),
+    linear-gradient(to bottom, rgba(0,0,0,.02), rgba(0,0,0,.22)) !important;
+}
+
+.pin-detail-card .detail-content {
+  position: relative !important;
+  z-index: 2 !important;
+  min-width: 0 !important;
+  max-height: calc(100dvh - 48px) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: clamp(28px, 3vw, 46px) clamp(24px, 3vw, 44px) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.pin-detail-card .detail-content::before,
+.pin-detail-card .detail-content::after {
+  display: none !important;
+}
+
+.pin-detail-card-no-image .detail-content {
+  min-height: min(560px, calc(100dvh - 48px)) !important;
+}
+
+.pin-detail-card .detail-content > .mt-7 {
+  border-top-color: rgba(255,255,255,.08) !important;
+}
+
+@media (min-width: 1181px) {
+  .board-detail-shell > aside {
+    width: var(--board-sidebar-width) !important;
+  }
+}
+
+@media (max-width: 1180px) {
+  .board-detail-shell > aside {
+    padding-top: 0 !important;
+  }
+  .board-detail-shell > section {
+    width: 100vw !important;
+  }
+  .board-detail-shell .top-glass {
+    margin-left: 0 !important;
+    padding-left: clamp(12px, 3vw, 22px) !important;
+    width: 100vw !important;
+  }
+}
+
+@media (max-width: 860px) {
+  .pin-detail-card .detail-grid,
+  .pin-detail-card .detail-grid-with-image,
+  .pin-detail-card .detail-grid-no-image {
+    display: block !important;
+    overflow-y: auto !important;
+  }
+  .pin-detail-card .detail-media {
+    height: 38dvh !important;
+    min-height: 220px !important;
+  }
+  .pin-detail-card .detail-content {
+    max-height: none !important;
+    padding: 24px !important;
+  }
+  .dashboard-hero h1 {
+    font-size: clamp(3rem, 14vw, 5.8rem) !important;
+  }
+}
