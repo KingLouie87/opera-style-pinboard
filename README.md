@@ -1,3 +1,9 @@
+# Broken Horizon Pinboard Rebuild
+
+Pinboard-only App mit Broken-Horizon-inspirierter Glas- und Gallery-Oberfläche.
+
+Siehe `docs/REBUILD_BROKEN_HORIZON_PINBOARD.md`.
+
 # Pinboard Focused Premium
 
 A focused premium visual pinboard app built with Next.js, TypeScript, Tailwind CSS and Supabase.

@@ -5,7 +5,7 @@ import { ThemeScript } from '@/components/pinboard/ThemeScript';
 
 export const metadata: Metadata = {
   title: 'Pinboard',
-  description: 'A premium visual pinboard for links, media, files and inspiration.',
+  description: 'Broken Horizon inspired visual pinboard for links, media, files and inspiration.',
   applicationName: 'Pinboard',
   manifest: '/manifest.webmanifest'
 };
