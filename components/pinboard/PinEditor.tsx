@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Eye, FileUp, ImagePlus, Link as LinkIcon, Loader2, Pipette, Sparkles, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/browser';
 import { autoTags, COLOR_PRESETS, inferMediaKind, normalizeOptionalUrl } from '@/lib/media';
@@ -90,6 +90,8 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
   const [expert, setExpert] = useState(false);
   const [error, setError] = useState('');
   const supabase = createClient();
+  const lastAnalyzedUrl = useRef('');
+  const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const tagList = useMemo(() => sanitizeTags(draft.tags), [draft.tags]);
   const sectionTitle = sections.find(section => section.id === draft.section_id)?.title ?? 'Ohne Bereich';
@@ -98,9 +100,28 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
     setDraft(current => ({ ...current, [key]: value }));
   }
 
-  async function loadPreview() {
-    const normalized = normalizeOptionalUrl(draft.url);
+  async function cacheRemoteImage(imageUrl: string) {
+    try {
+      const response = await fetch('/api/cache-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ imageUrl }) });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || 'Bild konnte nicht gespeichert werden.');
+      setDraft(current => ({
+        ...current,
+        image_url: json.image_url || current.image_url || imageUrl,
+        image_path: json.image_path || current.image_path,
+        dominant_color: json.dominant_color || current.dominant_color,
+        color: json.dominant_color || current.color,
+        aspect_ratio: json.aspect_ratio || current.aspect_ratio
+      }));
+    } catch {
+      setDraft(current => current.image_url ? current : { ...current, image_url: imageUrl });
+    }
+  }
+
+  async function loadPreview(urlOverride?: string) {
+    const normalized = normalizeOptionalUrl(urlOverride ?? draft.url);
     if (!normalized) return;
+    lastAnalyzedUrl.current = normalized;
     setLoadingPreview(true);
     setError('');
     try {
@@ -118,15 +139,37 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
         source: current.source || data.source || '',
         media_kind: data.mediaKind,
         content_type: data.contentType || '',
-        tags: tags.length ? tags.join(', ') : sanitizeTags(autoTags(`${data.title ?? ''} ${data.description ?? ''}`)).join(', '),
+        tags: current.tags || (tags.length ? tags.join(', ') : sanitizeTags(autoTags(`${data.title ?? ''} ${data.description ?? ''}`)).join(', ')),
         image_url: current.image_url || data.images[0] || current.image_url
       }));
+      if (data.images[0] && !draft.image_url) void cacheRemoteImage(data.images[0]);
     } catch (event) {
-      setError(event instanceof Error ? event.message : 'Preview fehlgeschlagen. Der Pin kann trotzdem gespeichert werden.');
+      const fallbackDomain = (() => {
+        try { return new URL(normalized).hostname.replace(/^www\./, ''); } catch { return ''; }
+      })();
+      setDraft(current => ({
+        ...current,
+        url: normalized,
+        source: current.source || fallbackDomain,
+        title: current.title || fallbackDomain || current.title
+      }));
+      setError(event instanceof Error ? `${event.message} Der Pin kann trotzdem gespeichert werden.` : 'Preview fehlgeschlagen. Der Pin kann trotzdem gespeichert werden.');
     } finally {
       setLoadingPreview(false);
     }
   }
+
+  useEffect(() => {
+    const normalized = normalizeOptionalUrl(draft.url);
+    if (!normalized || normalized === lastAnalyzedUrl.current) return;
+    if (previewTimer.current) clearTimeout(previewTimer.current);
+    previewTimer.current = setTimeout(() => {
+      void loadPreview(normalized);
+    }, 550);
+    return () => {
+      if (previewTimer.current) clearTimeout(previewTimer.current);
+    };
+  }, [draft.url]);
 
   async function chooseRemoteImage(imageUrl: string) {
     setUploading(true);
@@ -283,7 +326,7 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
               <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--text-soft)]"><LinkIcon size={16} /> Link-Import</div>
               <div className="grid gap-2 md:grid-cols-[1fr_auto]">
                 <input value={draft.url} onChange={event => setField('url', event.target.value)} placeholder="Link optional einfügen oder aus dem Browser hineinziehen" className="field" />
-                <button type="button" onClick={loadPreview} disabled={loadingPreview || !draft.url.trim()} className="btn-ghost px-4 py-3 text-sm font-semibold disabled:opacity-50">{loadingPreview ? <Loader2 className="animate-spin" size={17} /> : <Sparkles size={17} />} Analysieren</button>
+                <button type="button" onClick={() => loadPreview()} disabled={loadingPreview || !draft.url.trim()} className="btn-ghost px-4 py-3 text-sm font-semibold disabled:opacity-50">{loadingPreview ? <Loader2 className="animate-spin" size={17} /> : <Sparkles size={17} />} Analysieren</button>
               </div>
               {preview && <div className="mt-4"><ImagePicker images={preview.images} selected={draft.image_url} onSelect={chooseRemoteImage} disabled={uploading} /></div>}
             </section>

@@ -20,7 +20,7 @@ import {
   useSensors
 } from '@dnd-kit/core';
 import { rectSortingStrategy, SortableContext, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, ChevronRight, Filter, FolderInput, Grid2X2, Layers3, List, ListTree, LogOut, Moon, Plus, RotateCcw, Search, Settings, SlidersHorizontal, Sun, Trash2, UploadCloud, X } from 'lucide-react';
+import { Archive, ArrowDown, ArrowLeft, ArrowUp, CheckSquare, ChevronDown, ChevronRight, Filter, FolderInput, Grid2X2, Layers3, List, ListTree, LogOut, Moon, Plus, RotateCcw, Search, Settings, SlidersHorizontal, Sun, Trash2, UploadCloud, X } from 'lucide-react';
 import { Board, BoardSection, Pin } from '@/lib/types';
 import { createClient } from '@/lib/supabase/browser';
 import { nextPosition, normalizePositions } from '@/lib/position';
@@ -39,6 +39,7 @@ type DisplayGroup = { id: string | null; title: string; description?: string | n
 type PinContext = null | { pin: Pin; x: number; y: number };
 type SectionContext = null | { group: DisplayGroup; x: number; y: number };
 type PinMoveState = null | { pin: Pin };
+type BulkMoveState = null | { kind: 'pins' };
 type ConfirmState = null | { title: string; message: string; confirmLabel?: string; onConfirm: () => void };
 type ViewMode = 'detailed' | 'standard' | 'compact';
 
@@ -101,13 +102,45 @@ function PinMoveDialog({ pin, groups, currentSectionId, onMove, onClose }: {
   );
 }
 
-function BoardSectionPanel({ group, onAdd, onToggle, onRename, onContext, activeTarget, children }: {
+
+function BulkMoveDialog({ count, groups, onMove, onClose }: {
+  count: number;
+  groups: DisplayGroup[];
+  onMove: (sectionId: string | null) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="modal-backdrop z-[78]" onMouseDown={onClose} role="dialog" aria-modal="true">
+      <article className="move-dialog" onMouseDown={event => event.stopPropagation()}>
+        <button type="button" onClick={onClose} className="move-dialog-close" aria-label="Schließen"><X size={16} /></button>
+        <p>Mehrfachauswahl</p>
+        <h2>{count} Pins verschieben</h2>
+        <div className="move-target-columns move-target-columns-single">
+          <section>
+            <h3>Zielbereich wählen</h3>
+            {groups.map(group => (
+              <button key={group.id ?? 'inbox'} type="button" onClick={() => onMove(group.id ?? null)}>
+                <FolderInput size={14} />
+                <span>{group.title}</span>
+              </button>
+            ))}
+          </section>
+        </div>
+      </article>
+    </div>
+  );
+}
+
+function BoardSectionPanel({ group, onAdd, onToggle, onRename, onContext, activeTarget, selectionMode = false, selected = false, onToggleSelected, children }: {
   group: DisplayGroup;
   onAdd: (sectionId: string | null) => void;
   onToggle?: () => void;
   onRename?: (sectionId: string, title: string) => void;
   onContext: (group: DisplayGroup, point: { x: number; y: number }) => void;
   activeTarget?: boolean;
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelected?: (group: DisplayGroup) => void;
   children: ReactNode;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `section:${group.id ?? 'inbox'}` });
@@ -136,6 +169,7 @@ function BoardSectionPanel({ group, onAdd, onToggle, onRename, onContext, active
   return (
     <section id={`section-${group.id ?? 'inbox'}`} ref={setNodeRef} onContextMenu={openOptions} className={`section-panel transition ${group.collapsed ? 'section-panel-collapsed' : ''} ${isDropTarget ? 'section-panel-over' : ''}`}>
       <header className="section-header">
+        {selectionMode && !group.isInbox && <button type="button" onClick={(event) => { event.stopPropagation(); onToggleSelected?.(group); }} className={`section-select-button ${selected ? 'selected' : ''}`} aria-label="Teilbereich auswählen">{selected ? '✓' : ''}</button>}
         <button type="button" onClick={onToggle} className="section-title-button" disabled={group.isInbox || editing}>
           {group.isInbox ? <Layers3 size={17} className="text-[var(--accent)]" /> : group.collapsed ? <ChevronRight size={17} /> : <ChevronDown size={17} />}
           {editing ? (
@@ -211,6 +245,10 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
   const [detailPin, setDetailPin] = useState<Pin | null>(null);
   const [pinContext, setPinContext] = useState<PinContext>(null);
   const [movePin, setMovePin] = useState<PinMoveState>(null);
+  const [bulkMove, setBulkMove] = useState<BulkMoveState>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedPinIds, setSelectedPinIds] = useState<string[]>([]);
+  const [selectedSectionIds, setSelectedSectionIds] = useState<string[]>([]);
   const [sectionContext, setSectionContext] = useState<SectionContext>(null);
   const [confirm, setConfirm] = useState<ConfirmState>(null);
   const [draggingOver, setDraggingOver] = useState(false);
@@ -267,6 +305,8 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
   const mediaKinds = useMemo(() => Array.from(new Set(pins.map(pin => pin.media_kind).filter(Boolean))) as string[], [pins]);
   const activePin = activeId?.startsWith('pin:') ? pins.find(pin => pin.id === activeId.slice(4)) : null;
   const sectionById = useMemo(() => new Map(sections.map(section => [section.id, section])), [sections]);
+  const selectedPins = useMemo(() => pins.filter(pin => selectedPinIds.includes(pin.id) && !pin.archived_at && !pin.deleted_at), [pins, selectedPinIds]);
+  const selectedSections = useMemo(() => sections.filter(section => selectedSectionIds.includes(section.id)), [sections, selectedSectionIds]);
 
   const collisionDetection: CollisionDetection = (args) => {
     const isSectionHit = (id: unknown) => {
@@ -400,6 +440,86 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
     await supabase.from('pins').update({ section_id: sectionId, position }).eq('id', pin.id);
   }
 
+
+  function toggleSelectionMode() {
+    setSelectionMode(current => {
+      const next = !current;
+      if (!next) {
+        setSelectedPinIds([]);
+        setSelectedSectionIds([]);
+      }
+      return next;
+    });
+  }
+
+  function togglePinSelection(pin: Pin) {
+    setSelectedPinIds(current => current.includes(pin.id) ? current.filter(id => id !== pin.id) : [...current, pin.id]);
+  }
+
+  function toggleSectionSelection(group: DisplayGroup) {
+    if (!group.id) return;
+    setSelectedSectionIds(current => current.includes(group.id!) ? current.filter(id => id !== group.id) : [...current, group.id!]);
+  }
+
+  function clearSelection() {
+    setSelectedPinIds([]);
+    setSelectedSectionIds([]);
+    setSelectionMode(false);
+  }
+
+  async function archiveSelectedPins() {
+    const ids = selectedPinIds;
+    if (!ids.length) return;
+    const archivedAt = new Date().toISOString();
+    setUndo({ pins, label: 'Auswahl archiviert' });
+    setPins(current => current.map(pin => ids.includes(pin.id) ? { ...pin, archived_at: archivedAt } : pin));
+    clearSelection();
+    await supabase.from('pins').update({ archived_at: archivedAt }).in('id', ids);
+  }
+
+  function requestDeleteSelection() {
+    const pinCount = selectedPinIds.length;
+    const sectionCount = selectedSectionIds.length;
+    if (!pinCount && !sectionCount) return;
+    setConfirm({
+      title: 'Auswahl löschen?',
+      message: `${pinCount} Pins und ${sectionCount} Bereiche werden entfernt. Pins aus gelöschten Bereichen werden in „Ohne Teilbereich“ verschoben.`,
+      confirmLabel: 'Auswahl löschen',
+      onConfirm: deleteSelection
+    });
+  }
+
+  async function deleteSelection() {
+    const pinIds = selectedPinIds;
+    const sectionIds = selectedSectionIds;
+    setConfirm(null);
+    setUndo({ pins, sections, label: 'Auswahl gelöscht' });
+    const deletedAt = new Date().toISOString();
+    setPins(current => current
+      .filter(pin => !pinIds.includes(pin.id))
+      .map(pin => sectionIds.includes(pin.section_id ?? '') ? { ...pin, section_id: null } : pin));
+    setSections(current => current.filter(section => !sectionIds.includes(section.id)));
+    clearSelection();
+    if (pinIds.length) await supabase.from('pins').update({ deleted_at: deletedAt }).in('id', pinIds);
+    if (sectionIds.length) {
+      await supabase.from('pins').update({ section_id: null }).in('section_id', sectionIds);
+      await supabase.from('board_sections').delete().in('id', sectionIds);
+    }
+  }
+
+  async function moveSelectedPinsToSection(sectionId: string | null) {
+    const ids = selectedPinIds;
+    if (!ids.length) return;
+    setBulkMove(null);
+    setUndo({ pins, label: 'Auswahl verschoben' });
+    const scopePins = pins.filter(pin => !ids.includes(pin.id) && (pin.section_id ?? null) === (sectionId ?? null) && !pin.archived_at && !pin.deleted_at);
+    let position = nextPosition(scopePins);
+    const updates = pins.filter(pin => ids.includes(pin.id)).map(pin => ({ ...pin, section_id: sectionId, position: position++ }));
+    setPins(current => current.map(pin => updates.find(item => item.id === pin.id) ?? pin));
+    clearSelection();
+    await Promise.all(updates.map(pin => supabase.from('pins').update({ section_id: sectionId, position: pin.position }).eq('id', pin.id)));
+  }
+
   async function undoLast() {
     if (!undo) return;
     const previousPins = undo.pins;
@@ -495,7 +615,7 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
   }
 
   function renderPin(pin: Pin, mode: ViewMode) {
-    return <PinCard key={pin.id} pin={pin} mode={mode === 'compact' ? 'compact' : mode === 'detailed' ? 'detailed' : 'standard'} sectionTitle={sectionTitleForPin(pin)} onOpen={setDetailPin} onPlay={setPlaying} onContext={(item, point) => setPinContext({ pin: item, ...point })} />;
+    return <PinCard key={pin.id} pin={pin} mode={mode === 'compact' ? 'compact' : mode === 'detailed' ? 'detailed' : 'standard'} sectionTitle={sectionTitleForPin(pin)} selectionMode={selectionMode} selected={selectedPinIds.includes(pin.id)} onToggleSelected={togglePinSelection} onOpen={setDetailPin} onPlay={setPlaying} onContext={(item, point) => setPinContext({ pin: item, ...point })} />;
   }
 
   function openSectionContext(group: DisplayGroup, point: { x: number; y: number }) {
@@ -540,6 +660,7 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
               <select value={mediaFilter} onChange={event => setMediaFilter(event.target.value)} className="field app-select w-auto py-2"><option value="all">Alle Typen</option>{mediaKinds.map(kind => <option key={kind} value={kind}>{kind}</option>)}</select>
               <select value={sort} onChange={event => setSort(event.target.value as typeof sort)} className="field app-select w-auto py-2"><option value="position">Manuell</option><option value="newest">Neueste</option><option value="oldest">Älteste</option></select>
               {undo && <button onClick={undoLast} className="btn-ghost h-10 px-3 text-sm"><RotateCcw size={15} /> Rückgängig</button>}
+              <button onClick={toggleSelectionMode} className={`btn-ghost h-10 px-3 text-sm ${selectionMode ? 'active' : ''}`}><CheckSquare size={15} /> Auswahl</button>
               <button onClick={() => setSettingsOpen(true)} className="btn-ghost h-10 w-10"><SlidersHorizontal size={17} /></button>
               <button onClick={() => setEditor({ sectionId: null })} className="btn-primary h-10 px-4 text-sm"><Plus size={17} /> Pin</button>
             </div>
@@ -555,6 +676,15 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
             className="board-scroll relative flex-1 overflow-y-auto px-3 py-4 pb-28 md:px-5 md:pb-6"
           >
             <div className={`external-drop-hint ${draggingOver ? 'opacity-100' : 'opacity-0'}`}><UploadCloud size={28} /> Link hier ablegen und als Pin importieren</div>
+            {selectionMode && (selectedPinIds.length || selectedSectionIds.length) > 0 && (
+              <div className="bulk-action-bar">
+                <strong>{selectedPinIds.length} Pins · {selectedSectionIds.length} Bereiche</strong>
+                <button type="button" onClick={() => setBulkMove({ kind: 'pins' })} disabled={!selectedPinIds.length}><FolderInput size={14} /> Verschieben</button>
+                <button type="button" onClick={archiveSelectedPins} disabled={!selectedPinIds.length}><Archive size={14} /> Archivieren</button>
+                <button type="button" onClick={requestDeleteSelection}><Trash2 size={14} /> Löschen</button>
+                <button type="button" onClick={clearSelection}><X size={14} /> Abbrechen</button>
+              </div>
+            )}
 
             {viewMode === 'detailed' && (
               <section className="detailed-board-flow">
@@ -574,7 +704,7 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
             {viewMode === 'standard' && (
               <div className="section-stack">
                 {groups.map(group => (
-                  <BoardSectionPanel key={group.id ?? 'inbox'} group={group} activeTarget={overSectionId === (group.id ?? 'inbox')} onAdd={sectionId => setEditor({ sectionId })} onRename={renameSection} onContext={openSectionContext} onToggle={group.id ? () => toggleSection(group.id!) : undefined}>
+                  <BoardSectionPanel key={group.id ?? 'inbox'} group={group} activeTarget={overSectionId === (group.id ?? 'inbox')} onAdd={sectionId => setEditor({ sectionId })} onRename={renameSection} onContext={openSectionContext} onToggle={group.id ? () => toggleSection(group.id!) : undefined} selectionMode={selectionMode} selected={Boolean(group.id && selectedSectionIds.includes(group.id))} onToggleSelected={toggleSectionSelection}>
                     <SortableContext items={group.pins.map(pin => `pin:${pin.id}`)} strategy={rectSortingStrategy}>
                       <div className="pin-grid">
                         {group.pins.map(pin => renderPin(pin, 'standard'))}
@@ -588,7 +718,7 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
             {viewMode === 'compact' && (
               <div className="section-stack compact-section-stack">
                 {groups.map(group => (
-                  <BoardSectionPanel key={group.id ?? 'inbox'} group={group} activeTarget={overSectionId === (group.id ?? 'inbox')} onAdd={sectionId => setEditor({ sectionId })} onRename={renameSection} onContext={openSectionContext} onToggle={group.id ? () => toggleSection(group.id!) : undefined}>
+                  <BoardSectionPanel key={group.id ?? 'inbox'} group={group} activeTarget={overSectionId === (group.id ?? 'inbox')} onAdd={sectionId => setEditor({ sectionId })} onRename={renameSection} onContext={openSectionContext} onToggle={group.id ? () => toggleSection(group.id!) : undefined} selectionMode={selectionMode} selected={Boolean(group.id && selectedSectionIds.includes(group.id))} onToggleSelected={toggleSectionSelection}>
                     <SortableContext items={group.pins.map(pin => `pin:${pin.id}`)} strategy={rectSortingStrategy}>
                       <div className="compact-pin-list">
                         {group.pins.map(pin => renderPin(pin, 'compact'))}
@@ -608,7 +738,7 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
       {editor && <PinEditor boardId={currentBoard.id} sections={sections} targetSectionId={editor.sectionId ?? null} existingPin={editor.pin ?? null} existingPins={pins} initialUrl={editor.initialUrl} onClose={() => setEditor(null)} onSaved={onSaved} />}
       {settingsOpen && <BoardSettingsPanel board={currentBoard} pins={pins} onClose={() => setSettingsOpen(false)} onSaved={(next) => { setCurrentBoard(next); setSettingsOpen(false); }} />}
       {playing && <VideoLightbox pin={playing} onClose={() => setPlaying(null)} />}
-      {detailPin && <PinDetailModal pin={detailPin} onClose={() => setDetailPin(null)} onEdit={(pin) => setEditor({ pin, sectionId: pin.section_id })} onPlay={setPlaying} />}
+      {detailPin && <PinDetailModal pin={detailPin} onClose={() => setDetailPin(null)} onEdit={(pin) => { setDetailPin(null); setEditor({ pin, sectionId: pin.section_id }); }} onPlay={setPlaying} />}
       {pinContext && <ContextMenu x={pinContext.x} y={pinContext.y} onClose={() => setPinContext(null)} items={[
         { label: 'Öffnen', icon: pinMenuIcons.open, onSelect: () => setDetailPin(pinContext.pin) },
         { label: 'Bearbeiten', icon: pinMenuIcons.edit, onSelect: () => setEditor({ pin: pinContext.pin, sectionId: pinContext.pin.section_id }) },
@@ -617,6 +747,7 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
         { label: 'Archivieren', icon: pinMenuIcons.archive, onSelect: () => archivePin(pinContext.pin) },
         { label: 'Löschen', icon: pinMenuIcons.delete, danger: true, onSelect: () => requestDeletePin(pinContext.pin) }
       ]} />}
+      {bulkMove && <BulkMoveDialog count={selectedPinIds.length} groups={groups} onClose={() => setBulkMove(null)} onMove={moveSelectedPinsToSection} />}
       {movePin && <PinMoveDialog pin={movePin.pin} groups={groups} currentSectionId={movePin.pin.section_id ?? null} onClose={() => setMovePin(null)} onMove={(sectionId) => movePinToSection(movePin.pin, sectionId)} />}
       {sectionContext && <ContextMenu x={sectionContext.x} y={sectionContext.y} onClose={() => setSectionContext(null)} items={[
         { label: 'Anzeigen', icon: Filter, onSelect: () => { setViewMode('detailed'); setSectionFilter(sectionContext.group.id ?? 'inbox'); } },

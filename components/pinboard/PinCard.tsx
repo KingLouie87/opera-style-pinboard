@@ -14,6 +14,9 @@ type PinActions = {
   onArchive?: (pin: Pin) => void;
   onPlay?: (pin: Pin) => void;
   onContext?: (pin: Pin, point: { x: number; y: number }) => void;
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelected?: (pin: Pin) => void;
 };
 
 type PinMode = 'standard' | 'detailed' | 'compact';
@@ -89,7 +92,7 @@ export function PinOverlay({ pin }: { pin: Pin }) {
   );
 }
 
-export function PinCard({ pin, onOpen, onPlay, onContext, mode = 'standard', sectionTitle }: { pin: Pin; mode?: PinMode; sectionTitle?: string } & PinActions) {
+export function PinCard({ pin, onOpen, onPlay, onContext, mode = 'standard', sectionTitle, selectionMode = false, selected = false, onToggleSelected }: { pin: Pin; mode?: PinMode; sectionTitle?: string } & PinActions) {
   const sortable = useSortable({ id: `pin:${pin.id}` });
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = sortable;
   const style = {
@@ -105,16 +108,22 @@ export function PinCard({ pin, onOpen, onPlay, onContext, mode = 'standard', sec
     onContext?.(pin, { x: event.clientX, y: event.clientY });
   }
 
+  function activate() {
+    if (selectionMode) onToggleSelected?.(pin);
+    else onOpen?.(pin);
+  }
+
   if (mode === 'compact') {
     return (
       <article
         ref={setNodeRef}
         style={style}
-        onClick={() => onOpen?.(pin)}
+        onClick={activate}
         onContextMenu={openContext}
-        className={`pin-card pin-card-compact group relative select-none transition duration-200 ${isDragging ? 'pin-card-placeholder' : ''}`}
+        className={`pin-card pin-card-compact group relative select-none transition duration-200 ${isDragging ? 'pin-card-placeholder' : ''} ${selected ? 'pin-card-selected' : ''}`}
         aria-label={pin.title || 'Pin'}
       >
+        {selectionMode && <span className={`pin-select-indicator ${selected ? 'selected' : ''}`} aria-hidden="true">{selected ? '✓' : ''}</span>}
         <div className="compact-thumb">
           {pin.image_url ? <img src={pin.image_url} alt="" draggable={false} /> : <FileText size={18} />}
         </div>
@@ -134,11 +143,12 @@ export function PinCard({ pin, onOpen, onPlay, onContext, mode = 'standard', sec
     <article
       ref={setNodeRef}
       style={style}
-      onClick={() => onOpen?.(pin)}
+      onClick={activate}
       onContextMenu={openContext}
-      className={`pin-card group relative select-none transition duration-200 ${isDragging ? 'pin-card-placeholder' : ''}`}
+      className={`pin-card group relative select-none transition duration-200 ${isDragging ? 'pin-card-placeholder' : ''} ${selected ? 'pin-card-selected' : ''}`}
       aria-label={pin.title || 'Pin'}
     >
+      {selectionMode && <span className={`pin-select-indicator ${selected ? 'selected' : ''}`} aria-hidden="true">{selected ? '✓' : ''}</span>}
       <PinVisual pin={pin} mode={mode} sectionTitle={sectionTitle} />
 
       <div className="pin-actions">
