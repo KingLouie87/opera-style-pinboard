@@ -19,14 +19,14 @@ export async function POST(request: Request) {
   const contentType = response.headers.get('content-type') || 'image/jpeg';
   if (!contentType.startsWith('image/')) return NextResponse.json({ error: 'URL ist kein Bild.' }, { status: 400 });
   const arrayBuffer = await response.arrayBuffer();
-  if (arrayBuffer.byteLength > 12 * 1024 * 1024) return NextResponse.json({ error: 'Bild ist zu groß.' }, { status: 400 });
+  if (arrayBuffer.byteLength > 18 * 1024 * 1024) return NextResponse.json({ error: 'Bild ist zu groß.' }, { status: 400 });
 
   const input = Buffer.from(arrayBuffer);
   const meta = await sharp(input).metadata();
-  const resized = sharp(input).rotate().resize({ width: 1600, withoutEnlargement: true });
+  const resized = sharp(input).rotate().resize({ width: 2200, withoutEnlargement: true });
   const stats = await resized.clone().resize(1, 1, { fit: 'fill' }).raw().toBuffer();
   const dominant = `#${[stats[0], stats[1], stats[2]].map(value => value.toString(16).padStart(2, '0')).join('')}`;
-  const webp = await resized.webp({ quality: 82 }).toBuffer();
+  const webp = await resized.webp({ quality: 88, smartSubsample: true }).toBuffer();
   const path = `${userData.user.id}/remote-${crypto.randomUUID()}.webp`;
 
   const { error: uploadError } = await supabase.storage.from('pin-images').upload(path, webp, { contentType: 'image/webp', cacheControl: '31536000' });
@@ -41,8 +41,8 @@ export async function POST(request: Request) {
     size_bytes: webp.byteLength
   });
 
-  const width = Math.min(meta.width || 1600, 1600);
-  const height = meta.width && meta.height && meta.width > 1600 ? Math.round(meta.height * (1600 / meta.width)) : (meta.height || null);
+  const width = Math.min(meta.width || 2200, 2200);
+  const height = meta.width && meta.height && meta.width > 2200 ? Math.round(meta.height * (2200 / meta.width)) : (meta.height || null);
 
   return NextResponse.json({ image_url: `/api/images/${path}`, image_path: path, dominant_color: dominant, aspect_ratio: width && height ? width / height : null });
 }

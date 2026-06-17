@@ -4637,3 +4637,269 @@ body {
   }
   .bulk-action-bar { margin-left: 0; margin-right: 0; flex-wrap: wrap; width: 100%; }
 }
+
+/* ==========================================================
+   REDO PASS: link/header/popup/selection corrections
+   This block intentionally overrides prior partial attempts.
+   ========================================================== */
+:root {
+  --redo-header-height: 86px;
+  --redo-header-pad-x: clamp(14px, 1.4vw, 26px);
+  --redo-glass-bg:
+    linear-gradient(135deg,
+      rgba(255,255,255,0.085) 0%,
+      rgba(255,255,255,0.036) 24%,
+      rgba(18,20,23,0.36) 58%,
+      rgba(2,6,7,0.50) 100%
+    );
+  --redo-glass-filter: blur(34px) saturate(1.58) contrast(1.28) brightness(0.86);
+  --redo-glass-shadow:
+    inset 0 1px 0 rgba(255,255,255,.14),
+    inset 0 -1px 0 rgba(255,255,255,.07),
+    inset 0 -18px 32px rgba(0,0,0,.16),
+    0 18px 56px rgba(0,0,0,.34);
+}
+
+/* Ensure every app header uses the same visible Broken-Horizon glass and stays docked. */
+.dashboard-topbar,
+.top-glass,
+.board-detail-shell .top-glass,
+.archive-topbar {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 120 !important;
+  width: 100vw !important;
+  max-width: 100vw !important;
+  margin-left: calc(50% - 50vw) !important;
+  margin-right: calc(50% - 50vw) !important;
+  border-radius: 0 !important;
+  border-top: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-bottom: 1px solid rgba(255,255,255,.13) !important;
+  background: var(--redo-glass-bg) !important;
+  box-shadow: var(--redo-glass-shadow) !important;
+  -webkit-backdrop-filter: var(--redo-glass-filter) !important;
+  backdrop-filter: var(--redo-glass-filter) !important;
+  isolation: isolate !important;
+  overflow: visible !important;
+  transform: translate3d(0,0,0) !important;
+}
+
+.dashboard-topbar::before,
+.top-glass::before,
+.archive-topbar::before {
+  content: '' !important;
+  position: absolute !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+  background:
+    linear-gradient(to bottom, rgba(255,255,255,.14) 0%, rgba(255,255,255,.045) 1px, transparent 24px),
+    radial-gradient(circle at 18% 0%, rgba(255,255,255,.16), transparent 48%) !important;
+  opacity: .34 !important;
+}
+.dashboard-topbar::after,
+.top-glass::after,
+.archive-topbar::after {
+  content: '' !important;
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  height: 1px !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.34), transparent) !important;
+  opacity: .72 !important;
+}
+.dashboard-topbar > *,
+.top-glass > *,
+.archive-topbar > * { position: relative !important; z-index: 2 !important; }
+
+/* Board detail header must start at the viewport edge, not after the sidebar. */
+.board-detail-shell { position: relative !important; width: 100vw !important; overflow-x: hidden !important; }
+.board-detail-shell .top-glass {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100vw !important;
+  max-width: 100vw !important;
+  margin: 0 !important;
+  min-height: var(--redo-header-height) !important;
+  padding: 12px var(--redo-header-pad-x) !important;
+}
+.board-detail-shell > aside { padding-top: calc(var(--redo-header-height) + 16px) !important; }
+.board-detail-shell > section { padding-top: var(--redo-header-height) !important; }
+.board-detail-shell .top-glass > div { width: 100% !important; align-items: center !important; }
+.board-detail-shell .board-header-title-wrap {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+  justify-content: flex-start !important;
+  align-items: flex-start !important;
+  text-align: left !important;
+  flex: 0 1 auto !important;
+}
+.board-detail-shell .board-header-title-wrap > div { display: flex !important; flex-direction: column !important; align-items: flex-start !important; }
+.board-detail-shell .board-header-title {
+  order: 0 !important;
+  text-align: left !important;
+  font-size: clamp(1rem, .82vw, 1.2rem) !important;
+  color: rgba(244,241,232,.96) !important;
+}
+.board-detail-shell .board-header-meta {
+  order: 1 !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  margin-top: .28rem !important;
+  color: rgba(244,241,232,.55) !important;
+}
+.board-detail-shell .board-scroll { padding-top: clamp(18px, 2vw, 28px) !important; }
+
+/* Pin cards: lift domain/title higher, but keep them anchored in the lower cover area. */
+.pin-content-glass {
+  bottom: clamp(18px, 7.5%, 32px) !important;
+  left: clamp(12px, 5.5%, 18px) !important;
+  right: clamp(12px, 5.5%, 18px) !important;
+  padding: clamp(2.8rem, 19%, 4.85rem) 0 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+.pin-title-blur {
+  height: 72% !important;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.07) 25%, rgba(0,0,0,.42) 62%, rgba(0,0,0,.74) 100%),
+    radial-gradient(circle at 50% 92%, color-mix(in srgb, var(--pin-accent, #888) 18%, transparent), transparent 70%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(1.25) !important;
+  backdrop-filter: blur(16px) saturate(1.25) !important;
+}
+.pin-source {
+  font-size: .62rem !important;
+  letter-spacing: .075em !important;
+  line-height: 1 !important;
+  opacity: .92 !important;
+  max-width: 100% !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+.pin-title {
+  margin-top: .32rem !important;
+  -webkit-line-clamp: 3 !important;
+  line-height: 1.055 !important;
+}
+
+/* Popup: image must touch top/left/bottom edges, fade only at the side, and close button must sit top right. */
+.pin-detail-card { padding: 0 !important; overflow: hidden !important; }
+.pin-detail-card .detail-close {
+  top: 16px !important;
+  right: 16px !important;
+  left: auto !important;
+  margin: 0 !important;
+  transform: none !important;
+  z-index: 100 !important;
+}
+.pin-detail-card .detail-grid-with-image {
+  display: grid !important;
+  grid-template-columns: minmax(360px, 46%) minmax(0, 1fr) !important;
+  height: min(720px, calc(100dvh - 48px)) !important;
+  min-height: min(560px, calc(100dvh - 48px)) !important;
+  max-height: calc(100dvh - 48px) !important;
+  overflow: hidden !important;
+}
+.pin-detail-card .detail-media {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  align-self: stretch !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  overflow: hidden !important;
+  background: transparent !important;
+}
+.pin-detail-card .detail-media img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  max-height: none !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+  filter: none !important;
+  image-rendering: auto !important;
+}
+.pin-detail-card .detail-media::after {
+  inset: 0 0 0 auto !important;
+  width: clamp(92px, 12vw, 170px) !important;
+  height: 100% !important;
+  background: linear-gradient(to right, rgba(2,6,7,0) 0%, rgba(2,6,7,.22) 44%, rgba(2,6,7,.82) 100%) !important;
+  pointer-events: none !important;
+}
+.pin-detail-card .detail-content {
+  min-width: 0 !important;
+  max-height: calc(100dvh - 48px) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.pin-detail-card-no-image,
+.pin-detail-card-no-image .detail-grid,
+.pin-detail-card-no-image .detail-grid-no-image,
+.pin-detail-card-no-image .detail-content {
+  background: transparent !important;
+}
+.pin-detail-card-no-image .detail-grid,
+.pin-detail-card-no-image .detail-grid-no-image {
+  display: block !important;
+  min-height: min(540px, calc(100dvh - 48px)) !important;
+}
+.pin-detail-card-no-image .detail-content { padding: clamp(34px, 4vw, 60px) !important; }
+
+/* Pin editor must never outgrow the viewport; website image candidates scroll inside their own area. */
+.editor-glass-panel {
+  width: min(1100px, calc(100vw - 28px)) !important;
+  max-height: calc(100dvh - 28px) !important;
+  overflow: hidden !important;
+}
+.editor-glass-panel form { min-height: 0 !important; overflow-y: auto !important; overflow-x: hidden !important; }
+.image-picker-scroll { max-height: min(38dvh, 360px) !important; overflow-y: auto !important; overflow-x: hidden !important; padding-right: 4px; }
+.image-picker-scroll > div { max-width: 100% !important; }
+
+/* Remove any remaining black slab behind dashboard boards. */
+.board-gallery-section,
+.board-section-stack-main,
+.board-main-section,
+.board-main-section::before,
+.board-main-section::after {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+}
+.board-main-section::before,
+.board-main-section::after { display: none !important; }
+
+@media (max-width: 860px) {
+  .board-detail-shell .top-glass { position: sticky !important; min-height: auto !important; }
+  .board-detail-shell > aside,
+  .board-detail-shell > section { padding-top: 0 !important; }
+  .pin-detail-card .detail-grid-with-image { display: block !important; height: auto !important; }
+  .pin-detail-card .detail-media { height: 42dvh !important; min-height: 250px !important; }
+  .pin-detail-card .detail-media::after {
+    inset: auto 0 0 0 !important;
+    width: 100% !important;
+    height: 98px !important;
+    background: linear-gradient(to bottom, rgba(2,6,7,0), rgba(2,6,7,.80)) !important;
+  }
+}

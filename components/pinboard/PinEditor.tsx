@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, type ClipboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Eye, FileUp, ImagePlus, Link as LinkIcon, Loader2, Pipette, Sparkles, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/browser';
 import { autoTags, COLOR_PRESETS, inferMediaKind, normalizeOptionalUrl } from '@/lib/media';
@@ -98,6 +98,20 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
 
   function setField<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft(current => ({ ...current, [key]: value }));
+  }
+
+  function handleUrlChange(value: string) {
+    setField('url', value);
+  }
+
+  function handleUrlPaste(event: ClipboardEvent<HTMLInputElement>) {
+    const pasted = event.clipboardData.getData('text');
+    const normalized = normalizeOptionalUrl(pasted);
+    if (!normalized) return;
+    event.preventDefault();
+    if (previewTimer.current) clearTimeout(previewTimer.current);
+    setField('url', normalized);
+    void loadPreview(normalized);
   }
 
   async function cacheRemoteImage(imageUrl: string) {
@@ -325,10 +339,11 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
             <section className="rounded-[8px] border border-[var(--line)] bg-white/[0.035] p-4">
               <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--text-soft)]"><LinkIcon size={16} /> Link-Import</div>
               <div className="grid gap-2 md:grid-cols-[1fr_auto]">
-                <input value={draft.url} onChange={event => setField('url', event.target.value)} placeholder="Link optional einfügen oder aus dem Browser hineinziehen" className="field" />
-                <button type="button" onClick={() => loadPreview()} disabled={loadingPreview || !draft.url.trim()} className="btn-ghost px-4 py-3 text-sm font-semibold disabled:opacity-50">{loadingPreview ? <Loader2 className="animate-spin" size={17} /> : <Sparkles size={17} />} Analysieren</button>
+                <input value={draft.url} onChange={event => handleUrlChange(event.target.value)} onPaste={handleUrlPaste} placeholder="Link einfügen, Analyse startet automatisch" className="field" />
+                <button type="button" onClick={() => loadPreview()} disabled={loadingPreview || !draft.url.trim()} className="btn-ghost px-4 py-3 text-sm font-semibold disabled:opacity-50">{loadingPreview ? <Loader2 className="animate-spin" size={17} /> : <Sparkles size={17} />} Erneut</button>
               </div>
-              {preview && <div className="mt-4"><ImagePicker images={preview.images} selected={draft.image_url} onSelect={chooseRemoteImage} disabled={uploading} /></div>}
+              <p className="mt-2 text-xs text-[var(--muted)]">{loadingPreview ? 'Analyse läuft automatisch ...' : 'Beim Einfügen einer gültigen URL startet die Analyse automatisch.'}</p>
+              {preview && <div className="image-picker-scroll mt-4"><ImagePicker images={preview.images} selected={draft.image_url} onSelect={chooseRemoteImage} disabled={uploading} /></div>}
             </section>
 
             <section className="grid gap-4 md:grid-cols-2">

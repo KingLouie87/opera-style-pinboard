@@ -81,6 +81,36 @@ function previewFallback(target: URL, reason?: string, contentType: string | nul
   });
 }
 
+async function fetchWithFallbacks(target: URL) {
+  const candidates: URL[] = [target];
+  if (target.search) {
+    const withoutTracking = new URL(target.toString());
+    for (const key of Array.from(withoutTracking.searchParams.keys())) {
+      if (/^(utm_|fbclid|gclid|src|ref|mc_|yclid|igshid)/i.test(key)) withoutTracking.searchParams.delete(key);
+    }
+    if (withoutTracking.toString() !== target.toString()) candidates.push(withoutTracking);
+    const withoutQuery = new URL(target.toString());
+    withoutQuery.search = '';
+    if (!candidates.some(item => item.toString() === withoutQuery.toString())) candidates.push(withoutQuery);
+  }
+
+  let lastResponse: Response | null = null;
+  let lastError: unknown = null;
+
+  for (const candidate of candidates) {
+    try {
+      const response = await safeFetch(candidate.toString());
+      lastResponse = response;
+      if (response.ok) return { response, base: candidate };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastResponse) return { response: lastResponse, base: target };
+  throw lastError instanceof Error ? lastError : new Error('Preview fehlgeschlagen');
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
@@ -96,7 +126,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const response = await safeFetch(target.toString());
+    const { response, base } = await fetchWithFallbacks(target);
     const contentType = response.headers.get('content-type') ?? '';
 
     if (!response.ok) {
@@ -124,12 +154,13 @@ export async function POST(request: Request) {
 
     const html = await response.text();
     const $ = cheerio.load(html);
+    const pageBase = base ?? target;
     const title = $('meta[property="og:title"]').attr('content') || $('meta[name="twitter:title"]').attr('content') || $('title').first().text() || null;
     const description = $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || $('meta[name="twitter:description"]').attr('content') || null;
     const ogType = $('meta[property="og:type"]').attr('content') || '';
     const images: string[] = [];
     const push = (value: string | undefined | null, width?: string, height?: string) => {
-      const absolute = absoluteUrl(value, target);
+      const absolute = absoluteUrl(value, pageBase);
       if (absolute && looksUseful(absolute, width, height) && !images.includes(absolute)) images.push(absolute);
     };
 
@@ -151,7 +182,7 @@ export async function POST(request: Request) {
     });
     $('source').each((_, element) => srcsetUrls($(element).attr('srcset')).forEach(src => push(src)));
 
-    const favicon = absoluteUrl($('link[rel="apple-touch-icon"]').attr('href'), target) || absoluteUrl($('link[rel="icon"]').attr('href'), target) || absoluteUrl($('link[rel="shortcut icon"]').attr('href'), target) || absoluteUrl('/favicon.ico', target);
+    const favicon = absoluteUrl($('link[rel="apple-touch-icon"]').attr('href'), pageBase) || absoluteUrl($('link[rel="icon"]').attr('href'), pageBase) || absoluteUrl($('link[rel="shortcut icon"]').attr('href'), pageBase) || absoluteUrl('/favicon.ico', target);
     const mediaKind = youtubeEmbed(target.toString()) || ogType.includes('video') ? 'video' : inferMediaKind(target.toString(), contentType, null);
     const suggestedTags = autoTags(`${title ?? ''} ${description ?? ''} ${sourceName(target)} ${target.pathname}`).slice(0, 7);
 

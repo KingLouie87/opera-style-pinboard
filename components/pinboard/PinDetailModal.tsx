@@ -44,7 +44,7 @@ export function PinDetailModal({ pin, onClose, onEdit, onPlay }: { pin: Pin; onC
               {pin.file_path && <a href={`/api/files/${pin.file_path}`} target="_blank" rel="noreferrer"><Download size={15} /> {pin.file_name || 'Datei'} <em>{formatBytes(pin.file_size_bytes)}</em></a>}
             </div>
             <div className="mt-7 flex justify-end gap-2 border-t border-[var(--line)] pt-4">
-              <button type="button" onClick={() => onEdit?.(pin)} className="btn-ghost px-4 py-2 text-sm font-semibold">Bearbeiten</button>
+              <button type="button" onClick={() => { onClose(); window.setTimeout(() => onEdit?.(pin), 0); }} className="btn-ghost px-4 py-2 text-sm font-semibold">Bearbeiten</button>
               <button type="button" onClick={onClose} className="btn-primary px-4 py-2 text-sm">Schließen</button>
             </div>
           </div>
