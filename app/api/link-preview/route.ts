@@ -55,9 +55,63 @@ function sourceName(url: URL) {
   return url.hostname.replace(/^www\./, '');
 }
 
+function toTitleCase(value: string) {
+  return value
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean)
+    .map(word => {
+      if (/^[A-Z0-9]{2,}$/.test(word)) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ');
+}
+
 function niceTitleFromUrl(url: URL) {
-  const last = decodeURIComponent(url.pathname.split('/').filter(Boolean).pop() || sourceName(url));
-  return last.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim() || sourceName(url);
+  const parts = url.pathname.split('/').filter(Boolean);
+  const productIndex = parts.findIndex(part => ['products', 'product', 'items', 'item'].includes(part.toLowerCase()));
+  const candidate = decodeURIComponent(parts[productIndex >= 0 && parts[productIndex + 1] ? productIndex + 1 : parts.length - 1] || sourceName(url));
+  return toTitleCase(candidate) || sourceName(url);
+}
+
+const protectedTitlePatterns = [
+  /attention required/i,
+  /cloudflare/i,
+  /just a moment/i,
+  /access denied/i,
+  /403 forbidden/i,
+  /^forbidden$/i,
+  /checking your browser/i,
+  /bitte warten/i,
+  /please wait/i,
+  /security check/i
+];
+
+function isProtectedTitle(value: string | undefined | null) {
+  const text = (value || '').trim();
+  if (!text) return false;
+  return protectedTitlePatterns.some(pattern => pattern.test(text));
+}
+
+function cleanPreviewTitle(value: string | undefined | null, target: URL) {
+  const text = (value || '').replace(/\s+/g, ' ').trim();
+  if (!text || isProtectedTitle(text)) return niceTitleFromUrl(target);
+  return text;
+}
+
+function cleanPreviewDescription(value: string | undefined | null) {
+  const text = (value || '').replace(/\s+/g, ' ').trim();
+  if (!text || isProtectedTitle(text)) return null;
+  return text;
+}
+
+function fallbackWarningFor(target: URL, reason?: string) {
+  if (sourceName(target).includes('superhivemarket.com')) {
+    return 'Automatische Vorschau wurde von der Website blockiert. Manuelles Speichern bleibt möglich.';
+  }
+  return reason || 'Automatische Vorschau eingeschränkt. Manuelles Speichern bleibt möglich.';
 }
 
 function previewFallback(target: URL, reason?: string, contentType: string | null = null) {
@@ -68,7 +122,7 @@ function previewFallback(target: URL, reason?: string, contentType: string | nul
   return NextResponse.json({
     url: target.toString(),
     title: niceTitleFromUrl(target),
-    description: reason ? `Automatische Vorschau eingeschränkt: ${reason}. Der Link kann trotzdem gespeichert und manuell ergänzt werden.` : null,
+    description: reason ? fallbackWarningFor(target, reason) : null,
     favicon: absoluteUrl('/favicon.ico', target),
     source: sourceName(target),
     mediaKind,
@@ -141,8 +195,10 @@ export async function POST(request: Request) {
         try {
           const html = await response.clone().text();
           const $ = cheerio.load(html);
-          const title = $('meta[property="og:title"]').attr('content') || $('meta[name="twitter:title"]').attr('content') || $('title').first().text() || niceTitleFromUrl(target);
-          const description = $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || $('meta[name="twitter:description"]').attr('content') || null;
+          const rawTitle = $('meta[property="og:title"]').attr('content') || $('meta[name="twitter:title"]').attr('content') || $('title').first().text() || null;
+          const rawDescription = $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || $('meta[name="twitter:description"]').attr('content') || null;
+          const title = cleanPreviewTitle(rawTitle, target);
+          const description = cleanPreviewDescription(rawDescription);
           const images: string[] = [];
           const push = (value: string | undefined | null) => {
             const absolute = absoluteUrl(value, target);
@@ -155,8 +211,8 @@ export async function POST(request: Request) {
           const favicon = absoluteUrl($('link[rel="apple-touch-icon"]').attr('href'), target) || absoluteUrl($('link[rel="icon"]').attr('href'), target) || absoluteUrl('/favicon.ico', target);
           return NextResponse.json({
             url: target.toString(),
-            title: title?.trim() || niceTitleFromUrl(target),
-            description: description?.trim() || message,
+            title,
+            description: description || fallbackWarningFor(target, message),
             favicon,
             source: sourceName(target),
             mediaKind: youtubeEmbed(target.toString()) ? 'video' : inferMediaKind(target.toString(), contentType, null),
@@ -192,8 +248,10 @@ export async function POST(request: Request) {
     const html = await response.text();
     const $ = cheerio.load(html);
     const pageBase = base ?? target;
-    const title = $('meta[property="og:title"]').attr('content') || $('meta[name="twitter:title"]').attr('content') || $('title').first().text() || null;
-    const description = $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || $('meta[name="twitter:description"]').attr('content') || null;
+    const rawTitle = $('meta[property="og:title"]').attr('content') || $('meta[name="twitter:title"]').attr('content') || $('title').first().text() || null;
+    const rawDescription = $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || $('meta[name="twitter:description"]').attr('content') || null;
+    const title = cleanPreviewTitle(rawTitle, target);
+    const description = cleanPreviewDescription(rawDescription);
     const ogType = $('meta[property="og:type"]').attr('content') || '';
     const images: string[] = [];
     const push = (value: string | undefined | null, width?: string, height?: string) => {
@@ -225,8 +283,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       url: target.toString(),
-      title: title?.trim() || niceTitleFromUrl(target),
-      description: description?.trim() || null,
+      title,
+      description: description || null,
       favicon,
       source: sourceName(target),
       mediaKind,

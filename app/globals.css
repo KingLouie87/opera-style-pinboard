@@ -5689,3 +5689,110 @@ body {
     max-height: min(32dvh, 240px) !important;
   }
 }
+
+/* ==========================================================
+   STRICT LINK + HEADER HOTFIX
+   Sticky transparent Broken-Horizon glass headers on every board surface.
+   Appended last on purpose to override earlier experimental passes.
+   ========================================================== */
+:root {
+  --strict-header-bg:
+    linear-gradient(135deg,
+      rgba(255,255,255,.070) 0%,
+      rgba(255,255,255,.032) 22%,
+      rgba(18,20,23,.38) 58%,
+      rgba(4,6,8,.54) 100%);
+  --strict-header-border: rgba(255,255,255,.115);
+  --strict-header-shadow:
+    inset 0 1px 0 rgba(255,255,255,.11),
+    inset 0 -1px 0 rgba(255,255,255,.08),
+    inset 0 -18px 34px rgba(0,0,0,.18),
+    0 18px 48px rgba(0,0,0,.30);
+}
+
+.app-shell,
+.dashboard-shell,
+.board-detail-shell {
+  background:
+    radial-gradient(circle at 84% -8%, rgba(244,241,232,.095), transparent 21rem),
+    radial-gradient(circle at 8% 18%, rgba(244,241,232,.045), transparent 18rem),
+    radial-gradient(circle at 72% 34%, rgba(91,59,139,.090), transparent 28rem),
+    linear-gradient(180deg, rgba(8,11,12,.96), rgba(2,6,7,1)) !important;
+  overflow-x: clip !important;
+}
+
+.dashboard-topbar,
+.top-glass {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 90 !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--strict-header-border) !important;
+  border-radius: 0 !important;
+  background: var(--strict-header-bg) !important;
+  box-shadow: var(--strict-header-shadow) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(1.55) contrast(1.28) brightness(.88) !important;
+  backdrop-filter: blur(30px) saturate(1.55) contrast(1.28) brightness(.88) !important;
+  isolation: isolate !important;
+  transform: translate3d(0,0,0) !important;
+}
+
+.dashboard-topbar {
+  width: 100vw !important;
+  margin-left: calc(50% - 50vw) !important;
+  margin-right: calc(50% - 50vw) !important;
+  padding-left: max(22px, env(safe-area-inset-left)) !important;
+  padding-right: max(22px, env(safe-area-inset-right)) !important;
+}
+
+.top-glass {
+  width: 100% !important;
+  min-height: 72px !important;
+}
+
+.dashboard-topbar::before,
+.dashboard-topbar::after,
+.top-glass::before,
+.top-glass::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+}
+
+.dashboard-topbar::before,
+.top-glass::before {
+  background:
+    linear-gradient(to bottom, rgba(255,255,255,.075) 0%, rgba(255,255,255,.025) 1px, transparent 22px),
+    radial-gradient(circle at 18% 0%, rgba(255,255,255,.105) 0%, rgba(255,255,255,.035) 19%, transparent 48%) !important;
+  opacity: .34 !important;
+}
+
+.dashboard-topbar::after,
+.top-glass::after {
+  background:
+    linear-gradient(to bottom, transparent 0%, transparent calc(100% - 13px), rgba(255,255,255,.052) calc(100% - 5px), rgba(255,255,255,.108) 100%),
+    linear-gradient(to bottom, rgba(255,255,255,.012) 0%, transparent 28%, rgba(0,0,0,.18) 100%) !important;
+  opacity: .26 !important;
+}
+
+.dashboard-topbar > *,
+.top-glass > * {
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+[data-theme='light'] .dashboard-topbar,
+[data-theme='light'] .top-glass {
+  background:
+    linear-gradient(135deg,
+      rgba(255,255,255,.72) 0%,
+      rgba(255,255,255,.48) 32%,
+      rgba(244,241,232,.42) 66%,
+      rgba(224,220,208,.38) 100%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(1.32) contrast(1.06) brightness(1.02) !important;
+  backdrop-filter: blur(28px) saturate(1.32) contrast(1.06) brightness(1.02) !important;
+  border-bottom-color: rgba(18,16,12,.13) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.72), 0 16px 38px rgba(30,25,15,.10) !important;
+}
