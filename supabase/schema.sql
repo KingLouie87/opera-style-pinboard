@@ -53,6 +53,8 @@ create table if not exists public.pins (
   file_mime_type text,
   file_size_bytes integer,
   aspect_ratio numeric,
+  cover_focus_x numeric default 50,
+  cover_focus_y numeric default 50,
   tags text[] not null default '{}',
   position numeric not null default 1000,
   archived_at timestamptz,

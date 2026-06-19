@@ -55,6 +55,8 @@ export type Pin = {
   file_mime_type: string | null;
   file_size_bytes: number | null;
   aspect_ratio: number | null;
+  cover_focus_x: number | null;
+  cover_focus_y: number | null;
   position: number;
   archived_at: string | null;
   deleted_at: string | null;

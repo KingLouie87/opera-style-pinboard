@@ -28,6 +28,8 @@ type Draft = {
   file_mime_type: string;
   file_size_bytes: number | null;
   aspect_ratio: number | null;
+  cover_focus_x: number | null;
+  cover_focus_y: number | null;
   section_id: string | null;
 };
 
@@ -51,11 +53,66 @@ function fromPin(pin?: Pin | null, initialUrl?: string, targetSectionId?: string
     file_mime_type: pin?.file_mime_type ?? '',
     file_size_bytes: pin?.file_size_bytes ?? null,
     aspect_ratio: pin?.aspect_ratio ?? null,
+    cover_focus_x: pin?.cover_focus_x ?? 50,
+    cover_focus_y: pin?.cover_focus_y ?? 50,
     section_id: pin?.section_id ?? targetSectionId ?? null
   };
 }
 
-async function compressImageToWebp(file: File): Promise<{ blob: Blob; width: number; height: number; color: string }> {
+type ProcessedCover = { blob: Blob; width: number; height: number; color: string; focusX: number; focusY: number };
+
+function clampPercent(value: number) {
+  if (!Number.isFinite(value)) return 50;
+  return Math.max(8, Math.min(92, Math.round(value)));
+}
+
+function analyzeCanvasFocus(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  const sampleWidth = Math.max(24, Math.min(96, width));
+  const sampleHeight = Math.max(24, Math.min(96, height));
+  const sampleCanvas = document.createElement('canvas');
+  sampleCanvas.width = sampleWidth;
+  sampleCanvas.height = sampleHeight;
+  const sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
+  if (!sampleCtx) return { x: 50, y: 50 };
+  sampleCtx.drawImage(ctx.canvas, 0, 0, sampleWidth, sampleHeight);
+  const pixels = sampleCtx.getImageData(0, 0, sampleWidth, sampleHeight).data;
+  let weightedX = 0;
+  let weightedY = 0;
+  let total = 0;
+
+  const luminanceAt = (x: number, y: number) => {
+    const index = (y * sampleWidth + x) * 4;
+    return 0.2126 * pixels[index] + 0.7152 * pixels[index + 1] + 0.0722 * pixels[index + 2];
+  };
+
+  for (let y = 1; y < sampleHeight - 1; y += 1) {
+    for (let x = 1; x < sampleWidth - 1; x += 1) {
+      const index = (y * sampleWidth + x) * 4;
+      const r = pixels[index];
+      const g = pixels[index + 1];
+      const b = pixels[index + 2];
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const saturation = max - min;
+      const edge = Math.abs(luminanceAt(x + 1, y) - luminanceAt(x - 1, y)) + Math.abs(luminanceAt(x, y + 1) - luminanceAt(x, y - 1));
+      const nx = x / (sampleWidth - 1);
+      const ny = y / (sampleHeight - 1);
+      const centerBias = 1 - Math.min(0.72, Math.hypot(nx - 0.5, ny - 0.42));
+      const upperProductBias = 1 + Math.max(0, 0.55 - ny) * 0.22;
+      const score = Math.max(0, edge * 1.15 + saturation * 0.32) * Math.max(0.35, centerBias) * upperProductBias;
+      if (score > 0) {
+        weightedX += nx * score;
+        weightedY += ny * score;
+        total += score;
+      }
+    }
+  }
+
+  if (total <= 0) return { x: 50, y: 50 };
+  return { x: clampPercent((weightedX / total) * 100), y: clampPercent((weightedY / total) * 100) };
+}
+
+async function compressImageToWebp(file: File): Promise<ProcessedCover> {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, 1600 / bitmap.width);
   const width = Math.round(bitmap.width * scale);
@@ -63,13 +120,14 @@ async function compressImageToWebp(file: File): Promise<{ blob: Blob; width: num
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) throw new Error('Bild konnte nicht verarbeitet werden.');
   ctx.drawImage(bitmap, 0, 0, width, height);
+  const focus = analyzeCanvasFocus(ctx, width, height);
   const sample = ctx.getImageData(Math.floor(width / 2), Math.floor(height / 2), 1, 1).data;
   const color = `#${[sample[0], sample[1], sample[2]].map(v => v.toString(16).padStart(2, '0')).join('')}`;
   const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(result => result ? resolve(result) : reject(new Error('WebP-Konvertierung fehlgeschlagen.')), 'image/webp', 0.82));
-  return { blob, width, height, color };
+  return { blob, width, height, color, focusX: focus.x, focusY: focus.y };
 }
 
 export function PinEditor({ boardId, sections, targetSectionId, existingPin, existingPins, initialUrl, onClose, onSaved }: {
@@ -126,7 +184,9 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
         image_path: json.image_path || current.image_path,
         dominant_color: json.dominant_color || current.dominant_color,
         color: json.dominant_color || current.color,
-        aspect_ratio: json.aspect_ratio || current.aspect_ratio
+        aspect_ratio: json.aspect_ratio || current.aspect_ratio,
+        cover_focus_x: json.cover_focus_x ?? current.cover_focus_x ?? 50,
+        cover_focus_y: json.cover_focus_y ?? current.cover_focus_y ?? 50
       }));
     } catch {
       setDraft(current => current.image_url ? current : { ...current, image_url: imageUrl });
@@ -193,7 +253,7 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
       const response = await fetch('/api/cache-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ imageUrl }) });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Bild konnte nicht gespeichert werden.');
-      setDraft(current => ({ ...current, image_url: json.image_url, image_path: json.image_path, dominant_color: json.dominant_color || current.dominant_color, color: current.color || json.dominant_color || current.color, aspect_ratio: json.aspect_ratio || current.aspect_ratio }));
+      setDraft(current => ({ ...current, image_url: json.image_url, image_path: json.image_path, dominant_color: json.dominant_color || current.dominant_color, color: current.color || json.dominant_color || current.color, aspect_ratio: json.aspect_ratio || current.aspect_ratio, cover_focus_x: json.cover_focus_x ?? current.cover_focus_x ?? 50, cover_focus_y: json.cover_focus_y ?? current.cover_focus_y ?? 50 }));
     } catch (event) {
       setError(event instanceof Error ? event.message : 'Bild konnte nicht gespeichert werden.');
     } finally {
@@ -218,7 +278,7 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
         const { error: uploadError } = await supabase.storage.from('pin-images').upload(path, processed.blob, { contentType: 'image/webp', cacheControl: '31536000' });
         if (uploadError) throw new Error(uploadError.message);
         await supabase.from('pin_images').insert({ user_id: userData.user.id, source_type: 'upload', storage_path: path, mime_type: 'image/webp', size_bytes: processed.blob.size });
-        setDraft(current => ({ ...current, image_url: `/api/images/${path}`, image_path: path, dominant_color: processed.color, color: current.color || processed.color, media_kind: 'image', aspect_ratio: processed.width / processed.height }));
+        setDraft(current => ({ ...current, image_url: `/api/images/${path}`, image_path: path, dominant_color: processed.color, color: current.color || processed.color, media_kind: 'image', aspect_ratio: processed.width / processed.height, cover_focus_x: processed.focusX, cover_focus_y: processed.focusY }));
       } else {
         const extension = file.name.split('.').pop()?.toLowerCase() || 'bin';
         const path = `${userData.user.id}/${crypto.randomUUID()}.${extension}`;
@@ -258,7 +318,9 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
         image_path: path,
         dominant_color: processed.color,
         color: current.color || processed.color,
-        aspect_ratio: processed.width / processed.height
+        aspect_ratio: processed.width / processed.height,
+        cover_focus_x: processed.focusX,
+        cover_focus_y: processed.focusY
       }));
     } catch (event) {
       setError(event instanceof Error ? event.message : 'Cover konnte nicht hochgeladen werden.');
@@ -336,7 +398,9 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
       file_name: draft.file_name || null,
       file_mime_type: draft.file_mime_type || null,
       file_size_bytes: draft.file_size_bytes,
-      aspect_ratio: draft.aspect_ratio
+      aspect_ratio: draft.aspect_ratio,
+      cover_focus_x: draft.cover_focus_x ?? 50,
+      cover_focus_y: draft.cover_focus_y ?? 50
     };
 
     const scopePins = existingPins.filter(pin => (pin.section_id ?? null) === (draft.section_id || null));
@@ -376,7 +440,7 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
               onDragLeave={handleCoverDrag}
               onDrop={handleCoverDrop}
             >
-              {draft.image_url ? <img src={draft.image_url} alt="Pin Vorschau" className="h-full min-h-[320px] w-full object-cover" draggable={false} /> : <div className="text-center text-sm text-[var(--muted)]"><ImagePlus className="mx-auto mb-2" /> Bild hier ablegen oder Datei hochladen</div>}
+              {draft.image_url ? <img src={draft.image_url} alt="Pin Vorschau" className="h-full min-h-[320px] w-full object-cover" style={{ objectPosition: `${draft.cover_focus_x ?? 50}% ${draft.cover_focus_y ?? 50}%` }} draggable={false} /> : <div className="text-center text-sm text-[var(--muted)]"><ImagePlus className="mx-auto mb-2" /> Bild hier ablegen oder Datei hochladen</div>}
               {coverDragActive && <div className="cover-dropzone-overlay"><ImagePlus /> Bild hier ablegen</div>}
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -384,7 +448,7 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
                 <FileUp size={16} /> {uploading ? 'Upload läuft ...' : 'Datei hochladen'}
                 <input type="file" accept="image/*,video/*,audio/*,.pdf,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx,text/*" className="hidden" onChange={event => event.target.files?.[0] && uploadFile(event.target.files[0])} />
               </label>
-              <button type="button" onClick={() => setDraft(current => ({ ...current, image_url: '', image_path: '' }))} className="btn-ghost px-3 py-3 text-sm font-semibold">Cover entfernen</button>
+              <button type="button" onClick={() => setDraft(current => ({ ...current, image_url: '', image_path: '', cover_focus_x: 50, cover_focus_y: 50 }))} className="btn-ghost px-3 py-3 text-sm font-semibold">Cover entfernen</button>
             </div>
 
             <section className="mt-5 space-y-3">

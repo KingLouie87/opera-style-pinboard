@@ -49,6 +49,7 @@ export function PinVisual({ pin, floating = false, mode = 'standard', sectionTit
   const title = titleForPin(pin);
   const accent = pin.color || pin.dominant_color || '#8f8a80';
   const source = formatSource(pin);
+  const focusStyle = { objectPosition: `${pin.cover_focus_x ?? 50}% ${pin.cover_focus_y ?? 50}%` } as React.CSSProperties;
 
   return (
     <div
@@ -61,7 +62,7 @@ export function PinVisual({ pin, floating = false, mode = 'standard', sectionTit
       >
         {pin.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={pin.image_url} alt="" className="pin-cover-img" draggable={false} />
+          <img src={pin.image_url} alt="" className="pin-cover-img" style={focusStyle} draggable={false} />
         ) : (
           <div className="pin-cover-placeholder">
             <FileText size={28} />
@@ -125,7 +126,7 @@ export function PinCard({ pin, onOpen, onPlay, onContext, mode = 'standard', sec
       >
         {selectionMode && <span className={`pin-select-indicator ${selected ? 'selected' : ''}`} aria-hidden="true">{selected ? '✓' : ''}</span>}
         <div className="compact-thumb">
-          {pin.image_url ? <img src={pin.image_url} alt="" draggable={false} /> : <FileText size={18} />}
+          {pin.image_url ? <img src={pin.image_url} alt="" style={{ objectPosition: `${pin.cover_focus_x ?? 50}% ${pin.cover_focus_y ?? 50}%` }} draggable={false} /> : <FileText size={18} />}
         </div>
         <div className="compact-pin-copy">
           <strong>{pin.title || pin.file_name || 'Unbenannter Pin'}</strong>
