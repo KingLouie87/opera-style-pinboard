@@ -9,11 +9,13 @@ import { createClient } from '@/lib/supabase/browser';
 import { MobileNav } from '@/components/pinboard/MobileNav';
 import { ContextMenu } from '@/components/pinboard/ContextMenu';
 import { ConfirmDialog } from '@/components/pinboard/ConfirmDialog';
+import { RenameDialog } from '@/components/pinboard/RenameDialog';
 
 type Props = { boards: Board[]; userEmail: string };
 type BoardContext = null | { board: Board; x: number; y: number };
 type GroupContext = null | { group: string; x: number; y: number };
 type ConfirmState = null | { title: string; message: string; confirmLabel?: string; onConfirm: () => void };
+type RenameState = null | { kind: 'board'; board: Board } | { kind: 'group'; group: string };
 type BoardSort = 'manual' | 'alpha' | 'newest' | 'updated';
 
 type GroupsByWorkspace = Record<WorkspaceType, string[]>;
@@ -85,6 +87,9 @@ export function BoardDashboard({ boards: initialBoards, userEmail }: Props) {
   const [groupContext, setGroupContext] = useState<GroupContext>(null);
   const [confirm, setConfirm] = useState<ConfirmState>(null);
   const [moveBoard, setMoveBoard] = useState<Board | null>(null);
+  const [rename, setRename] = useState<RenameState>(null);
+  const [renameSaving, setRenameSaving] = useState(false);
+  const [renameError, setRenameError] = useState('');
   const [draggingBoardId, setDraggingBoardId] = useState<string | null>(null);
   const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -180,6 +185,46 @@ export function BoardDashboard({ boards: initialBoards, userEmail }: Props) {
     if (data) setBoards(current => [data as Board, ...current]);
   }
 
+  async function renameBoard(board: Board, title: string) {
+    const next = title.trim().slice(0, 120);
+    if (!next) return;
+    setRenameSaving(true);
+    setRenameError('');
+    const previous = boards;
+    setBoards(current => current.map(item => item.id === board.id ? { ...item, title: next } : item));
+    const { error } = await supabase.from('boards').update({ title: next }).eq('id', board.id);
+    setRenameSaving(false);
+    if (error) {
+      setBoards(previous);
+      setRenameError(error.message);
+      return;
+    }
+    setRename(null);
+  }
+
+  async function renameBoardGroup(group: string, title: string) {
+    const next = cleanGroup(title).slice(0, 120);
+    if (!next || next === group) {
+      setRename(null);
+      return;
+    }
+    setRenameSaving(true);
+    setRenameError('');
+    const previousBoards = boards;
+    const previousGroups = extraGroups;
+    setBoards(current => current.map(board => boardGroup(board) === group && boardWorkspace(board) === workspace ? { ...board, board_group: next === 'Ohne Bereich' ? null : next } : board));
+    setExtraGroups(current => current.map(name => name === group ? next : name));
+    const { error } = await supabase.from('boards').update({ board_group: next === 'Ohne Bereich' ? null : next }).eq('workspace_type', workspace).eq('board_group', group === 'Ohne Bereich' ? null : group);
+    setRenameSaving(false);
+    if (error) {
+      setBoards(previousBoards);
+      setExtraGroups(previousGroups);
+      setRenameError(error.message);
+      return;
+    }
+    setRename(null);
+  }
+
   async function moveBoardTo(board: Board, targetWorkspace: WorkspaceType, targetGroup: string) {
     const safeGroup = cleanGroup(targetGroup);
     const board_group = safeGroup === 'Ohne Bereich' ? null : safeGroup;
@@ -209,12 +254,10 @@ export function BoardDashboard({ boards: initialBoards, userEmail }: Props) {
     if (name && !extraGroups.includes(name)) setExtraGroups(current => [...current, name]);
   }
 
-  async function renameGroup(group: string) {
-    const next = window.prompt('Board-Bereich umbenennen', group)?.trim();
-    if (!next || next === group) return;
-    setBoards(current => current.map(board => boardGroup(board) === group && boardWorkspace(board) === workspace ? { ...board, board_group: next === 'Ohne Bereich' ? null : next } : board));
-    setExtraGroups(current => current.map(name => name === group ? next : name));
-    await supabase.from('boards').update({ board_group: next === 'Ohne Bereich' ? null : next }).eq('workspace_type', workspace).eq('board_group', group === 'Ohne Bereich' ? null : group);
+  function renameGroup(group: string) {
+    if (group === 'Ohne Bereich') return;
+    setRenameError('');
+    setRename({ kind: 'group', group });
   }
 
   function requestDeleteGroup(group: string) {
@@ -350,6 +393,7 @@ export function BoardDashboard({ boards: initialBoards, userEmail }: Props) {
       <MobileNav onAdd={() => createBoard()} onFocusSearch={() => searchRef.current?.focus()} />
       {context && <ContextMenu x={context.x} y={context.y} onClose={() => setContext(null)} items={[
         { label: 'Öffnen', icon: ExternalLink, onSelect: () => router.push(`/boards/${context.board.id}`) },
+        { label: 'Umbenennen', icon: Pencil, onSelect: () => { setRenameError(''); setRename({ kind: 'board', board: context.board }); } },
         { label: 'Bearbeiten', icon: Pencil, onSelect: () => router.push(`/boards/${context.board.id}`) },
         { label: 'Verschieben', icon: FolderInput, onSelect: () => setMoveBoard(context.board) },
         { label: 'Duplizieren', icon: Copy, onSelect: () => duplicateBoard(context.board) },
@@ -362,6 +406,7 @@ export function BoardDashboard({ boards: initialBoards, userEmail }: Props) {
         { label: 'Alphabetisch sortieren', icon: Search, onSelect: () => setSort('alpha') },
         { label: 'Löschen', icon: Trash2, disabled: groupContext.group === 'Ohne Bereich', danger: true, onSelect: () => requestDeleteGroup(groupContext.group) }
       ]} />}
+      {rename && <RenameDialog title={rename.kind === 'board' ? 'Board umbenennen' : 'Bereich umbenennen'} initialValue={rename.kind === 'board' ? rename.board.title : rename.group} saving={renameSaving} error={renameError} onCancel={() => setRename(null)} onSubmit={(value) => rename.kind === 'board' ? renameBoard(rename.board, value) : renameBoardGroup(rename.group, value)} />}
       {moveBoard && <MoveBoardDialog board={moveBoard} groups={groupsByWorkspace} onClose={() => setMoveBoard(null)} onMove={(targetWorkspace, targetGroup) => moveBoardTo(moveBoard, targetWorkspace, targetGroup)} />}
       {confirm && <ConfirmDialog title={confirm.title} message={confirm.message} confirmLabel={confirm.confirmLabel} onCancel={() => setConfirm(null)} onConfirm={confirm.onConfirm} />}
     </main>

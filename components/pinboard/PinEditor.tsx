@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, type ClipboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, type ClipboardEvent, type DragEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Eye, FileUp, ImagePlus, Link as LinkIcon, Loader2, Pipette, Sparkles, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/browser';
 import { autoTags, COLOR_PRESETS, inferMediaKind, normalizeOptionalUrl } from '@/lib/media';
@@ -89,6 +89,7 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
   const [saving, setSaving] = useState(false);
   const [expert, setExpert] = useState(false);
   const [error, setError] = useState('');
+  const [coverDragActive, setCoverDragActive] = useState(false);
   const supabase = createClient();
   const lastAnalyzedUrl = useRef('');
   const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -232,6 +233,59 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
     }
   }
 
+  async function uploadCoverImage(file: File) {
+    if (!file.type.startsWith('image/')) {
+      setError('Lege bitte eine PNG-, JPG-, WEBP- oder andere Bilddatei in den Coverbereich.');
+      return;
+    }
+    setUploading(true);
+    setError('');
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) {
+      setError('Nicht angemeldet.');
+      setUploading(false);
+      return;
+    }
+    try {
+      const processed = await compressImageToWebp(file);
+      const path = `${userData.user.id}/${crypto.randomUUID()}.webp`;
+      const { error: uploadError } = await supabase.storage.from('pin-images').upload(path, processed.blob, { contentType: 'image/webp', cacheControl: '31536000' });
+      if (uploadError) throw new Error(uploadError.message);
+      await supabase.from('pin_images').insert({ user_id: userData.user.id, source_type: 'upload', storage_path: path, mime_type: 'image/webp', size_bytes: processed.blob.size });
+      setDraft(current => ({
+        ...current,
+        image_url: `/api/images/${path}`,
+        image_path: path,
+        dominant_color: processed.color,
+        color: current.color || processed.color,
+        aspect_ratio: processed.width / processed.height
+      }));
+    } catch (event) {
+      setError(event instanceof Error ? event.message : 'Cover konnte nicht hochgeladen werden.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleCoverDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    setCoverDragActive(false);
+    const file = Array.from(event.dataTransfer.files || []).find(item => item.type.startsWith('image/'));
+    if (!file) {
+      setError('Lege bitte eine PNG-, JPG-, WEBP- oder andere Bilddatei in den Coverbereich.');
+      return;
+    }
+    await uploadCoverImage(file);
+  }
+
+  function handleCoverDrag(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.type === 'dragenter' || event.type === 'dragover') setCoverDragActive(true);
+    if (event.type === 'dragleave') setCoverDragActive(false);
+  }
+
   async function useEyeDropper() {
     const win = window as Window & { EyeDropper?: new () => { open: () => Promise<{ sRGBHex: string }> } };
     if (!win.EyeDropper) {
@@ -315,8 +369,15 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
 
         <form onSubmit={savePin} className="board-scroll grid flex-1 gap-0 overflow-y-auto lg:grid-cols-[minmax(360px,420px)_1fr]">
           <aside className="border-b border-[var(--line)] p-4 lg:border-b-0 lg:border-r">
-            <div className="grid min-h-[320px] place-items-center overflow-hidden rounded-[8px] border border-dashed border-[var(--line)] bg-black/22">
-              {draft.image_url ? <img src={draft.image_url} alt="Pin Vorschau" className="h-full min-h-[320px] w-full object-cover" /> : <div className="text-center text-sm text-[var(--muted)]"><ImagePlus className="mx-auto mb-2" /> Kein Cover ausgewählt</div>}
+            <div
+              className={`cover-dropzone grid min-h-[320px] place-items-center overflow-hidden rounded-[8px] border border-dashed border-[var(--line)] bg-black/22 ${coverDragActive ? 'cover-dropzone-active' : ''}`}
+              onDragEnter={handleCoverDrag}
+              onDragOver={handleCoverDrag}
+              onDragLeave={handleCoverDrag}
+              onDrop={handleCoverDrop}
+            >
+              {draft.image_url ? <img src={draft.image_url} alt="Pin Vorschau" className="h-full min-h-[320px] w-full object-cover" draggable={false} /> : <div className="text-center text-sm text-[var(--muted)]"><ImagePlus className="mx-auto mb-2" /> Bild hier ablegen oder Datei hochladen</div>}
+              {coverDragActive && <div className="cover-dropzone-overlay"><ImagePlus /> Bild hier ablegen</div>}
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               <label className="btn-ghost cursor-pointer px-3 py-3 text-center text-sm font-semibold">

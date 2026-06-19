@@ -31,6 +31,7 @@ import { MobileNav } from './MobileNav';
 import { VideoLightbox } from './VideoLightbox';
 import { ContextMenu, pinMenuIcons } from './ContextMenu';
 import { ConfirmDialog } from './ConfirmDialog';
+import { RenameDialog } from './RenameDialog';
 import { PinDetailModal } from './PinDetailModal';
 
 type EditorState = null | { sectionId?: string | null; pin?: Pin | null; initialUrl?: string };
@@ -41,6 +42,7 @@ type SectionContext = null | { group: DisplayGroup; x: number; y: number };
 type PinMoveState = null | { pin: Pin };
 type BulkMoveState = null | { kind: 'pins' };
 type ConfirmState = null | { title: string; message: string; confirmLabel?: string; onConfirm: () => void };
+type RenameState = null | { kind: 'pin'; pin: Pin } | { kind: 'section'; group: DisplayGroup };
 type ViewMode = 'detailed' | 'standard' | 'compact';
 
 function parseId(id: string) {
@@ -251,6 +253,9 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
   const [selectedSectionIds, setSelectedSectionIds] = useState<string[]>([]);
   const [sectionContext, setSectionContext] = useState<SectionContext>(null);
   const [confirm, setConfirm] = useState<ConfirmState>(null);
+  const [rename, setRename] = useState<RenameState>(null);
+  const [renameSaving, setRenameSaving] = useState(false);
+  const [renameError, setRenameError] = useState('');
   const [draggingOver, setDraggingOver] = useState(false);
   const [overSectionId, setOverSectionId] = useState<string | null | 'inbox'>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -352,8 +357,8 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
 
   function requestRenameSection(group: DisplayGroup) {
     if (!group.id) return;
-    const title = window.prompt('Teilbereich umbenennen', group.title)?.trim();
-    if (title) renameSection(group.id, title);
+    setRenameError('');
+    setRename({ kind: 'section', group });
   }
 
   async function toggleSection(sectionId: string) {
@@ -429,6 +434,45 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
     const scopePins = pins.filter(item => (item.section_id ?? null) === (pin.section_id ?? null));
     const { data } = await supabase.from('pins').insert({ ...rest, user_id: userData.user.id, title: `${pin.title ?? 'Pin'} Kopie`, position: nextPosition(scopePins), archived_at: null, deleted_at: null }).select('*').single();
     if (data) setPins(current => [data as Pin, ...current]);
+  }
+
+  async function renamePin(pin: Pin, title: string) {
+    const next = title.trim().slice(0, 120);
+    if (!next) return;
+    setRenameSaving(true);
+    setRenameError('');
+    const previous = pins;
+    setPins(current => current.map(item => item.id === pin.id ? { ...item, title: next } : item));
+    const { error } = await supabase.from('pins').update({ title: next }).eq('id', pin.id);
+    setRenameSaving(false);
+    if (error) {
+      setPins(previous);
+      setRenameError(error.message);
+      return;
+    }
+    setRename(null);
+  }
+
+  async function submitRename(value: string) {
+    if (!rename) return;
+    const next = value.trim().slice(0, 120);
+    if (!next) return;
+    if (rename.kind === 'section' && rename.group.id) {
+      setRenameSaving(true);
+      setRenameError('');
+      const previous = sections;
+      setSections(current => current.map(item => item.id === rename.group.id ? { ...item, title: next } : item));
+      const { error } = await supabase.from('board_sections').update({ title: next }).eq('id', rename.group.id);
+      setRenameSaving(false);
+      if (error) {
+        setSections(previous);
+        setRenameError(error.message);
+        return;
+      }
+      setRename(null);
+      return;
+    }
+    if (rename.kind === 'pin') await renamePin(rename.pin, next);
   }
 
   async function movePinToSection(pin: Pin, sectionId: string | null) {
@@ -741,6 +785,7 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
       {detailPin && <PinDetailModal pin={detailPin} onClose={() => setDetailPin(null)} onEdit={(pin) => { setDetailPin(null); setEditor({ pin, sectionId: pin.section_id }); }} onPlay={setPlaying} />}
       {pinContext && <ContextMenu x={pinContext.x} y={pinContext.y} onClose={() => setPinContext(null)} items={[
         { label: 'Öffnen', icon: pinMenuIcons.open, onSelect: () => setDetailPin(pinContext.pin) },
+        { label: 'Umbenennen', icon: pinMenuIcons.edit, onSelect: () => { setRenameError(''); setRename({ kind: 'pin', pin: pinContext.pin }); } },
         { label: 'Bearbeiten', icon: pinMenuIcons.edit, onSelect: () => setEditor({ pin: pinContext.pin, sectionId: pinContext.pin.section_id }) },
         { label: 'Verschieben', icon: pinMenuIcons.move, onSelect: () => setMovePin({ pin: pinContext.pin }) },
         { label: 'Duplizieren', icon: pinMenuIcons.duplicate, onSelect: () => duplicatePin(pinContext.pin) },
@@ -757,6 +802,7 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
         { label: 'Alphabetisch sortieren', icon: List, onSelect: sortSectionsAlphabetically },
         { label: 'Löschen', icon: Trash2, disabled: !sectionContext.group.id, danger: true, onSelect: () => requestDeleteSection(sectionContext.group) }
       ]} />}
+      {rename && <RenameDialog title={rename.kind === 'pin' ? 'Pin umbenennen' : 'Teilbereich umbenennen'} initialValue={rename.kind === 'pin' ? (rename.pin.title || rename.pin.file_name || 'Unbenannter Pin') : rename.group.title} saving={renameSaving} error={renameError} onCancel={() => setRename(null)} onSubmit={submitRename} />}
       {confirm && <ConfirmDialog title={confirm.title} message={confirm.message} confirmLabel={confirm.confirmLabel} onCancel={() => setConfirm(null)} onConfirm={confirm.onConfirm} />}
     </main>
   );

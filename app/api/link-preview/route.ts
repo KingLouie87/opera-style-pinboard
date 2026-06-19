@@ -55,6 +55,11 @@ function sourceName(url: URL) {
   return url.hostname.replace(/^www\./, '');
 }
 
+function isSuperhive(url: URL) {
+  const host = sourceName(url).toLowerCase();
+  return host === 'superhivemarket.com';
+}
+
 function toTitleCase(value: string) {
   return value
     .replace(/[-_]+/g, ' ')
@@ -108,7 +113,7 @@ function cleanPreviewDescription(value: string | undefined | null) {
 }
 
 function fallbackWarningFor(target: URL, reason?: string) {
-  if (sourceName(target).includes('superhivemarket.com')) {
+  if (isSuperhive(target)) {
     return 'Automatische Vorschau wurde von der Website blockiert. Manuelles Speichern bleibt möglich.';
   }
   return reason || 'Automatische Vorschau eingeschränkt. Manuelles Speichern bleibt möglich.';
@@ -188,6 +193,8 @@ export async function POST(request: Request) {
         ? 'Die Website blockiert automatische Vorschauen mit 403. Manuelles Speichern bleibt möglich'
         : `Website konnte nicht vollständig geladen werden (${response.status}). Manuelles Speichern bleibt möglich`;
 
+      if (isSuperhive(target)) return previewFallback(target, message, contentType);
+
       // Some protected sites still return a readable HTML error page that contains
       // a useful title, canonical URL or image metadata. Parse that body before
       // falling back to a plain domain-only pin so difficult URLs still feel useful.
@@ -250,6 +257,7 @@ export async function POST(request: Request) {
     const pageBase = base ?? target;
     const rawTitle = $('meta[property="og:title"]').attr('content') || $('meta[name="twitter:title"]').attr('content') || $('title').first().text() || null;
     const rawDescription = $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || $('meta[name="twitter:description"]').attr('content') || null;
+    if (isSuperhive(target) && isProtectedTitle(rawTitle)) return previewFallback(target, 'Automatische Vorschau wurde von der Website blockiert. Manuelles Speichern bleibt möglich.', contentType);
     const title = cleanPreviewTitle(rawTitle, target);
     const description = cleanPreviewDescription(rawDescription);
     const ogType = $('meta[property="og:type"]').attr('content') || '';
