@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pinboard Quick Capture</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="panel">
+      <div class="brand">
+        <div class="mark">P</div>
+        <div>
+          <p>Pinboard</p>
+          <h1>Quick Capture</h1>
+        </div>
+      </div>
+
+      <section class="current">
+        <span>Aktuelle Seite</span>
+        <strong id="title">Lade Seite ...</strong>
+        <code id="url"></code>
+      </section>
+
+      <label class="field">
+        <span>App-Adresse</span>
+        <input id="appUrl" placeholder="http://localhost:3000" />
+      </label>
+
+      <div class="actions">
+        <button id="pinPopup" class="primary">Seite pinnen</button>
+        <button id="pinTab" class="secondary">Als Tab öffnen</button>
+      </div>
+
+      <button id="saveSettings" class="ghost">App-Adresse speichern</button>
+      <p id="status" class="status"></p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

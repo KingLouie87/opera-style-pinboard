@@ -55,3 +55,19 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 ## Deployment
 
 Push the project to GitHub and import it in Vercel. Add the same environment variables in Vercel and set Supabase Auth redirect URLs for your production domain.
+
+## Opera Quick Capture Extension
+
+Diese Version enthält zusätzlich eine lokale Opera/Chromium-Erweiterung im Ordner `opera-extension`.
+
+Kurzinstallation:
+
+1. App lokal starten oder Vercel-URL bereithalten.
+2. Opera öffnen: `opera://extensions`
+3. Entwicklermodus aktivieren.
+4. `Entpackte Erweiterung laden` klicken.
+5. Ordner `opera-extension` auswählen.
+6. Im Erweiterungs-Popup App-Adresse speichern, z. B. `http://localhost:3000` oder die Vercel-URL.
+7. Auf einer Website `Seite pinnen` klicken.
+
+Die Extension öffnet `/capture` und übergibt URL, Seitentitel und optional markierten Text. Rechtsklick-Kontextmenüs für Seite, Link, Bild und Auswahl sind ebenfalls enthalten.

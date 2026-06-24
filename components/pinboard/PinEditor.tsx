@@ -33,12 +33,12 @@ type Draft = {
   section_id: string | null;
 };
 
-function fromPin(pin?: Pin | null, initialUrl?: string, targetSectionId?: string | null): Draft {
+function fromPin(pin?: Pin | null, initialUrl?: string, targetSectionId?: string | null, initialTitle?: string, initialDescription?: string, initialImageUrl?: string): Draft {
   return {
-    title: pin?.title ?? '',
-    description: pin?.description ?? '',
+    title: pin?.title ?? initialTitle ?? '',
+    description: pin?.description ?? initialDescription ?? '',
     url: pin?.url ?? initialUrl ?? '',
-    image_url: pin?.image_url ?? '',
+    image_url: pin?.image_url ?? initialImageUrl ?? '',
     image_path: pin?.image_path ?? '',
     notes: pin?.notes ?? '',
     tags: (pin?.tags ?? []).join(', '),
@@ -46,7 +46,7 @@ function fromPin(pin?: Pin | null, initialUrl?: string, targetSectionId?: string
     source: pin?.source ?? '',
     color: pin?.color ?? COLOR_PRESETS[0],
     dominant_color: pin?.dominant_color ?? '',
-    media_kind: pin?.media_kind ?? 'webpage',
+    media_kind: pin?.media_kind ?? (initialImageUrl && !initialUrl ? 'image' : 'webpage'),
     content_type: pin?.content_type ?? '',
     file_path: pin?.file_path ?? '',
     file_name: pin?.file_name ?? '',
@@ -130,17 +130,20 @@ async function compressImageToWebp(file: File): Promise<ProcessedCover> {
   return { blob, width, height, color, focusX: focus.x, focusY: focus.y };
 }
 
-export function PinEditor({ boardId, sections, targetSectionId, existingPin, existingPins, initialUrl, onClose, onSaved }: {
+export function PinEditor({ boardId, sections, targetSectionId, existingPin, existingPins, initialUrl, initialTitle, initialDescription, initialImageUrl, onClose, onSaved }: {
   boardId: string;
   sections: BoardSection[];
   targetSectionId?: string | null;
   existingPin?: Pin | null;
   existingPins: Pin[];
   initialUrl?: string;
+  initialTitle?: string;
+  initialDescription?: string;
+  initialImageUrl?: string;
   onClose: () => void;
   onSaved: (pin: Pin) => void;
 }) {
-  const [draft, setDraft] = useState<Draft>(() => fromPin(existingPin, initialUrl, targetSectionId));
+  const [draft, setDraft] = useState<Draft>(() => fromPin(existingPin, initialUrl, targetSectionId, initialTitle, initialDescription, initialImageUrl));
   const [preview, setPreview] = useState<LinkPreview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [uploading, setUploading] = useState(false);
