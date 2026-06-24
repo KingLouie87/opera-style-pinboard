@@ -234,6 +234,9 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
   const [currentBoard, setCurrentBoard] = useState(board);
   const [sections, setSections] = useState(initialSections);
   const [pins, setPins] = useState(initialPins);
+  const [destinationBoards, setDestinationBoards] = useState<Board[]>([board]);
+  const [destinationSections, setDestinationSections] = useState<BoardSection[]>(initialSections);
+  const [destinationPins, setDestinationPins] = useState<Pin[]>(initialPins);
   const [editor, setEditor] = useState<EditorState>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -262,6 +265,25 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
   const searchRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadDestinations() {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!mounted || !userData.user) return;
+      const [{ data: boardsData }, { data: sectionsData }, { data: pinsData }] = await Promise.all([
+        supabase.from('boards').select('*').eq('user_id', userData.user.id).is('archived_at', null).is('deleted_at', null).order('board_position', { ascending: true }).order('updated_at', { ascending: false }),
+        supabase.from('board_sections').select('*').eq('user_id', userData.user.id).order('position'),
+        supabase.from('pins').select('*').eq('user_id', userData.user.id).is('deleted_at', null).is('archived_at', null).order('position')
+      ]);
+      if (!mounted) return;
+      setDestinationBoards(boardsData?.length ? boardsData as Board[] : [currentBoard]);
+      setDestinationSections(sectionsData?.length ? sectionsData as BoardSection[] : sections);
+      setDestinationPins(pinsData?.length ? pinsData as Pin[] : pins);
+    }
+    void loadDestinations();
+    return () => { mounted = false; };
+  }, []);
 
   useEffect(() => {
     const stored = localStorage.getItem('pinboard-theme') === 'light' ? 'light' : 'dark';
@@ -574,9 +596,13 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
   }
 
   function onSaved(pin: Pin) {
-    setPins(current => current.some(item => item.id === pin.id) ? current.map(item => item.id === pin.id ? pin : item) : [pin, ...current]);
+    setDestinationPins(current => current.some(item => item.id === pin.id) ? current.map(item => item.id === pin.id ? pin : item) : [pin, ...current]);
+    setPins(current => {
+      if (pin.board_id !== currentBoard.id) return current.filter(item => item.id !== pin.id);
+      return current.some(item => item.id === pin.id) ? current.map(item => item.id === pin.id ? pin : item) : [pin, ...current];
+    });
     setEditor(null);
-    if (detailPin?.id === pin.id) setDetailPin(pin);
+    if (detailPin?.id === pin.id) setDetailPin(pin.board_id === currentBoard.id ? pin : null);
   }
 
   function onDragStart(event: DragStartEvent) {
@@ -779,7 +805,20 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
       </section>
 
       <MobileNav onAdd={() => setEditor({ sectionId: null })} onFocusSearch={() => searchRef.current?.focus()} />
-      {editor && <PinEditor boardId={currentBoard.id} sections={sections} targetSectionId={editor.sectionId ?? null} existingPin={editor.pin ?? null} existingPins={pins} initialUrl={editor.initialUrl} onClose={() => setEditor(null)} onSaved={onSaved} />}
+      {editor && <PinEditor
+        boardId={editor.pin?.board_id ?? currentBoard.id}
+        boards={destinationBoards}
+        sections={sections}
+        allSections={destinationSections}
+        allPins={destinationPins}
+        targetSectionId={editor.sectionId ?? null}
+        existingPin={editor.pin ?? null}
+        existingPins={pins}
+        allowBoardChange
+        initialUrl={editor.initialUrl}
+        onClose={() => setEditor(null)}
+        onSaved={onSaved}
+      />}
       {settingsOpen && <BoardSettingsPanel board={currentBoard} pins={pins} onClose={() => setSettingsOpen(false)} onSaved={(next) => { setCurrentBoard(next); setSettingsOpen(false); }} />}
       {playing && <VideoLightbox pin={playing} onClose={() => setPlaying(null)} />}
       {detailPin && <PinDetailModal pin={detailPin} onClose={() => setDetailPin(null)} onEdit={(pin) => { setDetailPin(null); setEditor({ pin, sectionId: pin.section_id }); }} onPlay={setPlaying} />}

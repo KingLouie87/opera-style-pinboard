@@ -16,10 +16,14 @@ export default async function CapturePage({ searchParams }: { searchParams: Prom
     const title = firstParam(params.title);
     const text = firstParam(params.text);
     const image = firstParam(params.image);
+    const boardId = firstParam(params.boardId);
+    const sectionId = firstParam(params.sectionId);
     if (url) target.set('url', url);
     if (title) target.set('title', title);
     if (text) target.set('text', text);
     if (image) target.set('image', image);
+    if (boardId) target.set('boardId', boardId);
+    if (sectionId) target.set('sectionId', sectionId);
     redirect(`/login?next=/capture${target.toString() ? `?${target.toString()}` : ''}`);
   }
 
@@ -38,5 +42,7 @@ export default async function CapturePage({ searchParams }: { searchParams: Prom
     initialTitle={firstParam(params.title)}
     initialDescription={firstParam(params.text)}
     initialImageUrl={firstParam(params.image)}
+    initialBoardId={firstParam(params.boardId)}
+    initialSectionId={firstParam(params.sectionId)}
   />;
 }

@@ -6102,3 +6102,132 @@ body {
     width: 100%;
   }
 }
+
+/* Destination selector for every capture path */
+.pin-destination-selector {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.055), rgba(255,255,255,0.018) 38%, rgba(0,0,0,0.18));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.075), 0 14px 34px rgba(0,0,0,0.18);
+  padding: 14px;
+  backdrop-filter: blur(22px) saturate(1.25);
+  -webkit-backdrop-filter: blur(22px) saturate(1.25);
+}
+
+.pin-destination-selector-compact {
+  min-width: min(520px, 100%);
+  padding: 12px;
+}
+
+.pin-destination-selector-empty h3,
+.pin-destination-title-row h3 {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.15;
+  letter-spacing: -0.04em;
+  color: var(--text);
+}
+
+.pin-destination-selector-empty p,
+.pin-destination-title-row span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.pin-destination-kicker {
+  margin: 0 0 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.pin-destination-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.pin-destination-grid {
+  display: grid;
+  gap: 10px;
+}
+
+@media (min-width: 760px) {
+  .pin-destination-grid {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  }
+}
+
+.pin-destination-field .field {
+  min-width: 0;
+  width: 100%;
+}
+
+.capture-target-panel .pin-destination-selector {
+  flex: 1 1 520px;
+}
+
+/* ==========================================================
+   TARGETED PINBOARD HEADER POSITION FIX ONLY
+   Mirrors the working dashboard header material while correcting
+   the board detail header offset caused by nesting next to sidebar.
+   ========================================================== */
+@media (min-width: 1024px) {
+  .board-detail-shell .pinboard-header-mirror {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    margin-left: -286px !important;
+    margin-right: 0 !important;
+    padding-left: calc(286px + max(22px, env(safe-area-inset-left))) !important;
+    padding-right: max(22px, env(safe-area-inset-right)) !important;
+    box-sizing: border-box !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .board-detail-shell .pinboard-header-mirror {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    margin-left: calc(50% - 50vw) !important;
+    margin-right: calc(50% - 50vw) !important;
+    padding-left: max(16px, env(safe-area-inset-left)) !important;
+    padding-right: max(16px, env(safe-area-inset-right)) !important;
+    box-sizing: border-box !important;
+  }
+}
+
+.board-detail-shell .pinboard-header-mirror {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 90 !important;
+  border-radius: 0 !important;
+  background: var(--strict-header-bg) !important;
+  border-bottom: 1px solid var(--strict-header-border) !important;
+  box-shadow: var(--strict-header-shadow) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(1.55) contrast(1.28) brightness(.88) !important;
+  backdrop-filter: blur(30px) saturate(1.55) contrast(1.28) brightness(.88) !important;
+  overflow: visible !important;
+  isolation: isolate !important;
+}
+
+.board-detail-shell .pinboard-header-mirror > div {
+  width: 100% !important;
+}
+
+[data-theme='light'] .board-detail-shell .pinboard-header-mirror {
+  background:
+    linear-gradient(135deg,
+      rgba(255,255,255,.72) 0%,
+      rgba(255,255,255,.48) 32%,
+      rgba(244,241,232,.42) 66%,
+      rgba(224,220,208,.38) 100%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(1.32) contrast(1.06) brightness(1.02) !important;
+  backdrop-filter: blur(28px) saturate(1.32) contrast(1.06) brightness(1.02) !important;
+  border-bottom-color: rgba(18,16,12,.13) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.72), 0 16px 38px rgba(30,25,15,.10) !important;
+}

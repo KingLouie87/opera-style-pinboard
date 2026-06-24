@@ -6,8 +6,9 @@ import { createClient } from '@/lib/supabase/browser';
 import { autoTags, COLOR_PRESETS, inferMediaKind, normalizeOptionalUrl } from '@/lib/media';
 import { sanitizeTags } from '@/lib/tags';
 import { nextPosition } from '@/lib/position';
-import { BoardSection, LinkPreview, Pin } from '@/lib/types';
+import { Board, BoardSection, LinkPreview, Pin } from '@/lib/types';
 import { ImagePicker } from './ImagePicker';
+import { PinDestinationSelector } from './PinDestinationSelector';
 
 type Draft = {
   title: string;
@@ -130,19 +131,25 @@ async function compressImageToWebp(file: File): Promise<ProcessedCover> {
   return { blob, width, height, color, focusX: focus.x, focusY: focus.y };
 }
 
-export function PinEditor({ boardId, sections, targetSectionId, existingPin, existingPins, initialUrl, initialTitle, initialDescription, initialImageUrl, onClose, onSaved }: {
+export function PinEditor({ boardId, boards = [], sections, allSections, targetSectionId, existingPin, existingPins, allPins, initialUrl, initialTitle, initialDescription, initialImageUrl, allowBoardChange = false, onDestinationChange, onClose, onSaved }: {
   boardId: string;
+  boards?: Board[];
   sections: BoardSection[];
+  allSections?: BoardSection[];
   targetSectionId?: string | null;
   existingPin?: Pin | null;
   existingPins: Pin[];
+  allPins?: Pin[];
   initialUrl?: string;
   initialTitle?: string;
   initialDescription?: string;
   initialImageUrl?: string;
+  allowBoardChange?: boolean;
+  onDestinationChange?: (boardId: string, sectionId: string | null) => void;
   onClose: () => void;
   onSaved: (pin: Pin) => void;
 }) {
+  const [selectedBoardId, setSelectedBoardId] = useState(existingPin?.board_id ?? boardId);
   const [draft, setDraft] = useState<Draft>(() => fromPin(existingPin, initialUrl, targetSectionId, initialTitle, initialDescription, initialImageUrl));
   const [preview, setPreview] = useState<LinkPreview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -155,12 +162,46 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
   const lastAnalyzedUrl = useRef('');
   const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const availableBoards = useMemo(() => boards.length ? boards : [], [boards]);
+  const destinationSections = useMemo(() => (allSections ?? sections).filter(section => section.board_id === selectedBoardId), [allSections, sections, selectedBoardId]);
+  const destinationPins = useMemo(() => (allPins ?? existingPins).filter(pin => pin.board_id === selectedBoardId), [allPins, existingPins, selectedBoardId]);
   const tagList = useMemo(() => sanitizeTags(draft.tags), [draft.tags]);
-  const sectionTitle = sections.find(section => section.id === draft.section_id)?.title ?? 'Ohne Bereich';
+  const sectionTitle = destinationSections.find(section => section.id === draft.section_id)?.title ?? 'Ohne Bereich';
+  const LAST_BOARD_KEY = 'pinboard-last-capture-board';
+  const sectionKey = (nextBoardId: string) => `pinboard-last-capture-section:${nextBoardId}`;
 
   function setField<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft(current => ({ ...current, [key]: value }));
   }
+
+  function chooseDestinationBoard(nextBoardId: string) {
+    if (!nextBoardId || nextBoardId === selectedBoardId) return;
+    setSelectedBoardId(nextBoardId);
+    let nextSectionId: string | null = null;
+    try {
+      const stored = localStorage.getItem(sectionKey(nextBoardId));
+      if (stored && (allSections ?? sections).some(section => section.id === stored && section.board_id === nextBoardId)) nextSectionId = stored;
+    } catch {}
+    setField('section_id', nextSectionId);
+    onDestinationChange?.(nextBoardId, nextSectionId);
+  }
+
+  function chooseDestinationSection(sectionId: string | null) {
+    const valid = sectionId ? destinationSections.some(section => section.id === sectionId) : true;
+    const next = valid ? sectionId : null;
+    setField('section_id', next);
+    onDestinationChange?.(selectedBoardId, next);
+  }
+
+  useEffect(() => {
+    if (!existingPin && boardId && boardId !== selectedBoardId) setSelectedBoardId(boardId);
+  }, [boardId, existingPin, selectedBoardId]);
+
+  useEffect(() => {
+    if (!selectedBoardId) return;
+    const validSection = !draft.section_id || destinationSections.some(section => section.id === draft.section_id);
+    if (!validSection) setField('section_id', null);
+  }, [selectedBoardId, destinationSections, draft.section_id]);
 
   function handleUrlChange(value: string) {
     setField('url', value);
@@ -381,7 +422,7 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
     }
 
     const payload = {
-      board_id: boardId,
+      board_id: selectedBoardId,
       section_id: draft.section_id || null,
       user_id: userData.user.id,
       title: draft.title.trim() || null,
@@ -406,9 +447,22 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
       cover_focus_y: draft.cover_focus_y ?? 50
     };
 
-    const scopePins = existingPins.filter(pin => (pin.section_id ?? null) === (draft.section_id || null));
+    const boardExists = !availableBoards.length || availableBoards.some(board => board.id === selectedBoardId);
+    if (!selectedBoardId || !boardExists) {
+      setError('Wähle ein gültiges Board aus.');
+      setSaving(false);
+      return;
+    }
+    if (draft.section_id && !destinationSections.some(section => section.id === draft.section_id && section.board_id === selectedBoardId)) {
+      setError('Wähle einen gültigen Bereich für dieses Board aus.');
+      setSaving(false);
+      return;
+    }
+
+    const scopePins = destinationPins.filter(pin => pin.id !== existingPin?.id && (pin.section_id ?? null) === (draft.section_id || null));
+    const movedDestination = Boolean(existingPin && (existingPin.board_id !== selectedBoardId || (existingPin.section_id ?? null) !== (draft.section_id || null)));
     const query = existingPin
-      ? supabase.from('pins').update(payload).eq('id', existingPin.id).select('*').single()
+      ? supabase.from('pins').update({ ...payload, ...(movedDestination ? { position: nextPosition(scopePins) } : {}) }).eq('id', existingPin.id).select('*').single()
       : supabase.from('pins').insert({ ...payload, position: nextPosition(scopePins) }).select('*').single();
 
     const { data, error: saveError } = await query;
@@ -419,6 +473,10 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
     }
     if (data) {
       if (draft.image_path) await supabase.from('pin_images').update({ pin_id: data.id }).eq('storage_path', draft.image_path);
+      try {
+        localStorage.setItem(LAST_BOARD_KEY, selectedBoardId);
+        if (draft.section_id) localStorage.setItem(sectionKey(selectedBoardId), draft.section_id);
+      } catch {}
       onSaved(data as Pin);
     }
   }
@@ -464,6 +522,16 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
           </aside>
 
           <main className="space-y-5 p-4 md:p-5">
+            <PinDestinationSelector
+              boards={availableBoards}
+              sections={allSections ?? sections}
+              selectedBoardId={selectedBoardId}
+              selectedSectionId={draft.section_id}
+              onBoardChange={chooseDestinationBoard}
+              onSectionChange={chooseDestinationSection}
+              disabled={saving || uploading || (Boolean(existingPin) && !allowBoardChange && availableBoards.length <= 1)}
+            />
+
             <section className="rounded-[8px] border border-[var(--line)] bg-white/[0.035] p-4">
               <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--text-soft)]"><LinkIcon size={16} /> Link-Import</div>
               <div className="grid gap-2 md:grid-cols-[1fr_auto]">
@@ -475,8 +543,7 @@ export function PinEditor({ boardId, sections, targetSectionId, existingPin, exi
             </section>
 
             <section className="grid gap-4 md:grid-cols-2">
-              <label className="block text-sm font-medium text-[var(--text-soft)]">Bereich<select value={draft.section_id ?? ''} onChange={event => setField('section_id', event.target.value || null)} className="field app-select mt-2"><option value="">Ohne Bereich / Inbox</option>{sections.map(section => <option key={section.id} value={section.id}>{section.title}</option>)}</select></label>
-              <label className="block text-sm font-medium text-[var(--text-soft)]">Kategorie<input value={draft.category} onChange={event => setField('category', event.target.value)} placeholder="Design, Blender, Hotel ..." className="field mt-2" /></label>
+              <label className="block text-sm font-medium text-[var(--text-soft)] md:col-span-2">Kategorie<input value={draft.category} onChange={event => setField('category', event.target.value)} placeholder="Design, Blender, Hotel ..." className="field mt-2" /></label>
               <label className="block text-sm font-medium text-[var(--text-soft)] md:col-span-2">Überschrift<input value={draft.title} onChange={event => setField('title', event.target.value)} placeholder="Titel des Pins" className="field mt-2 text-lg font-semibold" /></label>
               <label className="block text-sm font-medium text-[var(--text-soft)] md:col-span-2">Beschreibung<textarea value={draft.description} onChange={event => setField('description', event.target.value)} placeholder="Kurzer Kontext, warum dieser Pin wichtig ist" className="field mt-2 min-h-28 resize-y" /></label>
               <label className="block text-sm font-medium text-[var(--text-soft)]">Quelle<input value={draft.source} onChange={event => setField('source', event.target.value)} placeholder="z. B. youtube.com" className="field mt-2" /></label>

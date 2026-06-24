@@ -6,6 +6,7 @@ import { ArrowLeft, Check, ExternalLink, Grid2X2, LogOut, Plus, Sparkles } from 
 import { createClient } from '@/lib/supabase/browser';
 import type { Board, BoardSection, Pin } from '@/lib/types';
 import { PinEditor } from './PinEditor';
+import { PinDestinationSelector } from './PinDestinationSelector';
 
 type Props = {
   boards: Board[];
@@ -16,38 +17,71 @@ type Props = {
   initialTitle?: string;
   initialDescription?: string;
   initialImageUrl?: string;
+  initialBoardId?: string;
+  initialSectionId?: string;
 };
 
-function boardLabel(board: Board) {
-  const group = board.board_group?.trim();
-  const workspace = board.workspace_type === 'business' ? 'Business' : 'Private';
-  return `${board.title}${group ? ` · ${group}` : ''} · ${workspace}`;
-}
+const LAST_BOARD_KEY = 'pinboard-last-capture-board';
+const sectionKey = (boardId: string) => `pinboard-last-capture-section:${boardId}`;
 
 function sanitizeInitial(value?: string) {
   return (value ?? '').replace(/\s+/g, ' ').trim();
 }
 
-export function CaptureClient({ boards, sections, pins, userEmail, initialUrl = '', initialTitle = '', initialDescription = '', initialImageUrl = '' }: Props) {
-  const [selectedBoardId, setSelectedBoardId] = useState(boards[0]?.id ?? '');
-  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
+function chooseInitialBoard(boards: Board[], requested?: string) {
+  if (requested && boards.some(board => board.id === requested)) return requested;
+  return boards[0]?.id ?? '';
+}
+
+export function CaptureClient({ boards, sections, pins, userEmail, initialUrl = '', initialTitle = '', initialDescription = '', initialImageUrl = '', initialBoardId = '', initialSectionId = '' }: Props) {
+  const requestedBoardId = sanitizeInitial(initialBoardId);
+  const requestedSectionId = sanitizeInitial(initialSectionId);
+  const [selectedBoardId, setSelectedBoardId] = useState(() => chooseInitialBoard(boards, requestedBoardId));
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(requestedSectionId || null);
   const [editorOpen, setEditorOpen] = useState(Boolean(boards[0]));
   const [savedPin, setSavedPin] = useState<Pin | null>(null);
   const supabase = createClient();
 
-  useEffect(() => {
-    const stored = localStorage.getItem('pinboard-last-capture-board');
-    if (stored && boards.some(board => board.id === stored)) setSelectedBoardId(stored);
-  }, [boards]);
-
-  useEffect(() => {
-    if (selectedBoardId) localStorage.setItem('pinboard-last-capture-board', selectedBoardId);
-    setSelectedSectionId(null);
-  }, [selectedBoardId]);
-
   const selectedBoard = useMemo(() => boards.find(board => board.id === selectedBoardId) ?? boards[0] ?? null, [boards, selectedBoardId]);
   const boardSections = useMemo(() => selectedBoard ? sections.filter(section => section.board_id === selectedBoard.id) : [], [sections, selectedBoard]);
   const boardPins = useMemo(() => selectedBoard ? pins.filter(pin => pin.board_id === selectedBoard.id) : [], [pins, selectedBoard]);
+
+  useEffect(() => {
+    if (!boards.length) return;
+    if (requestedBoardId && boards.some(board => board.id === requestedBoardId)) return;
+    const stored = localStorage.getItem(LAST_BOARD_KEY);
+    if (stored && boards.some(board => board.id === stored)) setSelectedBoardId(stored);
+  }, [boards, requestedBoardId]);
+
+  useEffect(() => {
+    if (!selectedBoardId) return;
+    localStorage.setItem(LAST_BOARD_KEY, selectedBoardId);
+    const validSection = !selectedSectionId || sections.some(section => section.id === selectedSectionId && section.board_id === selectedBoardId);
+    if (!validSection) {
+      const storedSection = localStorage.getItem(sectionKey(selectedBoardId));
+      if (storedSection && sections.some(section => section.id === storedSection && section.board_id === selectedBoardId)) {
+        setSelectedSectionId(storedSection);
+      } else {
+        setSelectedSectionId(null);
+      }
+    }
+  }, [selectedBoardId, selectedSectionId, sections]);
+
+  useEffect(() => {
+    if (selectedBoardId && selectedSectionId && sections.some(section => section.id === selectedSectionId && section.board_id === selectedBoardId)) {
+      localStorage.setItem(sectionKey(selectedBoardId), selectedSectionId);
+    }
+  }, [selectedBoardId, selectedSectionId, sections]);
+
+  function chooseBoard(boardId: string) {
+    setSelectedBoardId(boardId);
+    const storedSection = localStorage.getItem(sectionKey(boardId));
+    if (storedSection && sections.some(section => section.id === storedSection && section.board_id === boardId)) {
+      setSelectedSectionId(storedSection);
+    } else {
+      setSelectedSectionId(null);
+    }
+  }
 
   async function signOut() {
     await supabase.auth.signOut();
@@ -68,29 +102,25 @@ export function CaptureClient({ boards, sections, pins, userEmail, initialUrl = 
         <div>
           <p className="hero-eyebrow"><Sparkles size={13} /> Quick Capture</p>
           <h1>Pin aus Opera hinzufügen</h1>
-          <p>Die aktuelle Seite wird vorbereitet. Wähle nur noch Ziel-Board und Bereich, prüfe Titel/Cover und speichere den Pin.</p>
+          <p>Die aktuelle Seite wird vorbereitet. Wähle Ziel-Board und Bereich, prüfe Titel/Cover und speichere den Pin.</p>
         </div>
         <div className="hero-control-panel hero-control-panel-inline clean-toolbar capture-target-panel">
-          <label className="capture-field">
-            <span>Board</span>
-            <select value={selectedBoardId} onChange={event => setSelectedBoardId(event.target.value)} className="field app-select">
-              {boards.map(board => <option key={board.id} value={board.id}>{boardLabel(board)}</option>)}
-            </select>
-          </label>
-          <label className="capture-field">
-            <span>Bereich</span>
-            <select value={selectedSectionId ?? ''} onChange={event => setSelectedSectionId(event.target.value || null)} className="field app-select" disabled={!selectedBoard}>
-              <option value="">Ohne Teilbereich</option>
-              {boardSections.map(section => <option key={section.id} value={section.id}>{section.title}</option>)}
-            </select>
-          </label>
+          <PinDestinationSelector
+            boards={boards}
+            sections={sections}
+            selectedBoardId={selectedBoardId}
+            selectedSectionId={selectedSectionId}
+            onBoardChange={chooseBoard}
+            onSectionChange={setSelectedSectionId}
+            compact
+          />
           <button type="button" onClick={() => { setSavedPin(null); setEditorOpen(true); }} disabled={!selectedBoard} className="btn-primary h-11 px-4 text-sm"><Plus size={17} /> Capture öffnen</button>
         </div>
       </section>
 
       <section className="capture-summary-card">
         {savedPin ? (
-          <div className="capture-success"><span><Check size={18} /></span><div><h2>Pin gespeichert</h2><p>„{savedPin.title || savedPin.url || 'Unbenannter Pin'}“ wurde in {selectedBoard?.title ?? 'deinem Board'} abgelegt.</p><Link href={`/boards/${savedPin.board_id}`} className="btn-ghost mt-4 h-10 px-3 text-sm">Board öffnen</Link></div></div>
+          <div className="capture-success"><span><Check size={18} /></span><div><h2>Pin gespeichert</h2><p>„{savedPin.title || savedPin.url || 'Unbenannter Pin'}“ wurde in {boards.find(board => board.id === savedPin.board_id)?.title ?? selectedBoard?.title ?? 'deinem Board'} abgelegt.</p><Link href={`/boards/${savedPin.board_id}`} className="btn-ghost mt-4 h-10 px-3 text-sm">Board öffnen</Link></div></div>
         ) : (
           <>
             <p className="hero-eyebrow">Eingehende Daten</p>
@@ -106,15 +136,27 @@ export function CaptureClient({ boards, sections, pins, userEmail, initialUrl = 
 
       {editorOpen && selectedBoard && <PinEditor
         boardId={selectedBoard.id}
+        boards={boards}
         sections={boardSections}
+        allSections={sections}
+        allPins={pins}
         targetSectionId={selectedSectionId}
         existingPins={boardPins}
         initialUrl={initialUrl}
         initialTitle={sanitizeInitial(initialTitle)}
         initialDescription={sanitizeInitial(initialDescription)}
         initialImageUrl={initialImageUrl}
+        allowBoardChange
+        onDestinationChange={(boardId, sectionId) => { setSelectedBoardId(boardId); setSelectedSectionId(sectionId); }}
         onClose={() => setEditorOpen(false)}
-        onSaved={(pin) => { setSavedPin(pin); setEditorOpen(false); }}
+        onSaved={(pin) => {
+          localStorage.setItem(LAST_BOARD_KEY, pin.board_id);
+          if (pin.section_id) localStorage.setItem(sectionKey(pin.board_id), pin.section_id);
+          setSelectedBoardId(pin.board_id);
+          setSelectedSectionId(pin.section_id ?? null);
+          setSavedPin(pin);
+          setEditorOpen(false);
+        }}
       />}
     </main>
   );
