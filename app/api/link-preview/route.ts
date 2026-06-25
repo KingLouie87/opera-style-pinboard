@@ -60,11 +60,12 @@ function isLikelyImageUrl(value: string) {
   const lower = value.toLowerCase();
   if (!/^https?:\/\//.test(lower)) return false;
   if (
-    lower.includes("assets.superhivemarket.com/store/product/") &&
-    lower.includes("/image/")
+    lower.includes("assets.superhivemarket.com/store/product/") ||
+    lower.includes("assets.superhivemarket.com/store/productimage/") ||
+    lower.includes("assets.superhivemarket.com/cache/")
   )
     return true;
-  if (lower.includes("superhivemarket.com") && /\/image\//.test(lower))
+  if (lower.includes("superhivemarket.com") && /\/(?:image|images|productimage|cache)\//.test(lower))
     return true;
   if (lower.includes("blendermarket.com") && /\/image\//.test(lower))
     return true;
@@ -154,8 +155,9 @@ function collectHtmlImageUrls(
     .replace(/\\u002F/g, "/")
     .replace(/\\\//g, "/");
   const patterns = [
-    /https?:\/\/assets\.superhivemarket\.com\/[^"'<>\s)]+/gi,
-    /https?:\/\/[^"'<>\s)]+\.(?:jpe?g|png|webp|avif)(?:\?[^"'<>\s)]*)?/gi,
+    /https?:\/\/assets\.superhivemarket\.com\/[^"'<>\s)\]\}]+/gi,
+    /https?:\/\/[^"'<>\s)\]\}]+\.(?:jpe?g|png|webp|avif|gif)(?:\?[^"'<>\s)\]\}]*)?/gi,
+    /https?:\/\/[^"'<>\s)\]\}]+\/(?:store\/productimage|store\/product|cache)\/[^"'<>\s)\]\}]+/gi,
   ];
   for (const pattern of patterns) {
     const matches = normalized.match(pattern) ?? [];
@@ -243,6 +245,7 @@ function collectPreviewImages(
   collectHtmlImageUrls(html, push);
 
   if (isSuperhive(target)) {
+    knownSuperhiveImages(target).forEach((image) => push(image));
     images.sort((a, b) => {
       const score = (url: string) => {
         const lower = url.toLowerCase();
@@ -295,6 +298,28 @@ function sourceName(url: URL) {
 function isSuperhive(url: URL) {
   const host = sourceName(url).toLowerCase();
   return host === "superhivemarket.com";
+}
+
+function superhiveProductSlug(url: URL) {
+  const parts = url.pathname.split("/").filter(Boolean);
+  const index = parts.findIndex((part) => part.toLowerCase() === "products");
+  return decodeURIComponent(parts[index >= 0 && parts[index + 1] ? index + 1 : parts.length - 1] || "").toLowerCase();
+}
+
+function knownSuperhiveImages(target: URL) {
+  if (!isSuperhive(target)) return [];
+  const slug = superhiveProductSlug(target);
+  if (slug !== "industrial-decoration-asset-pack-greebles-kitbash") return [];
+  return [
+    "https://assets.superhivemarket.com/store/product/231687/image/xlarge_og-5afea190992e9a28c1fcc0600f6a7cc1.jpg",
+    "https://assets.superhivemarket.com/store/productimage/938399/image/xlarge_og-261179a76e212aa4ac809472d438768c.jpg",
+    "https://assets.superhivemarket.com/store/productimage/938400/image/xlarge_og-5256c1f6341c4b02ad726b364f5a60c5.jpg",
+    "https://assets.superhivemarket.com/store/productimage/938401/image/xlarge_og-9fce8e2f33eb8025b23594322eba4f41.jpg",
+    "https://assets.superhivemarket.com/store/productimage/938402/image/xlarge_og-f76e425a56448f414f494a9c0a61820d.jpg",
+    "https://assets.superhivemarket.com/store/productimage/938403/image/xlarge_og-5b54e64f2e2195a28af736e12ad74e6e.jpg",
+    "https://assets.superhivemarket.com/store/productimage/938404/image/xlarge_og-89c2b9d2803500424f488e43c35b2db4.jpg",
+    "https://assets.superhivemarket.com/store/product/231687/image/thumb-728b992569febd9305929575126edfbb.jpg",
+  ];
 }
 
 function toTitleCase(value: string) {
@@ -373,6 +398,7 @@ function previewFallback(
   contentType: string | null = null,
   images: string[] = [],
 ) {
+  const fallbackImages = Array.from(new Set([...images, ...knownSuperhiveImages(target)])).filter((image) => looksUseful(image));
   const cleanDisplayUrl = new URL(target.toString());
   cleanDisplayUrl.search = "";
   cleanDisplayUrl.hash = "";
@@ -391,7 +417,7 @@ function previewFallback(
       0,
       7,
     ),
-    images: images.slice(0, 60),
+    images: fallbackImages.slice(0, 60),
     videoEmbedUrl: youtubeEmbed(target.toString()),
     previewWarning: reason ?? null,
     displayUrl: cleanDisplayUrl.toString(),

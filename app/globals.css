@@ -6723,3 +6723,264 @@ body {
     height: 18px !important;
   }
 }
+
+/* ==========================================================
+   FINAL TARGETED PATCH: mobile viewport containment + remove
+   header back-button side effects. Desktop behavior is untouched.
+   ========================================================== */
+@media (max-width: 760px) {
+  html,
+  body {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: clip !important;
+  }
+
+  body > * {
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .app-shell.board-detail-shell,
+  .board-detail-shell {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: start !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 100dvh !important;
+    overflow-x: clip !important;
+    overflow-y: visible !important;
+    position: relative !important;
+  }
+
+  .board-detail-shell > aside {
+    display: none !important;
+  }
+
+  .board-detail-shell > section {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow-x: clip !important;
+    overflow-y: visible !important;
+  }
+
+  .board-detail-shell .pinboard-header-mirror,
+  .board-detail-shell .top-glass.pinboard-header-mirror {
+    position: sticky !important;
+    top: 0 !important;
+    left: auto !important;
+    right: auto !important;
+    transform: none !important;
+    translate: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: calc(env(safe-area-inset-top) + 10px) 12px 12px !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+  }
+
+  .board-detail-shell .pinboard-header-mirror > div {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .board-detail-shell .board-header-title-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    display: flex !important;
+    justify-content: flex-start !important;
+    align-items: flex-start !important;
+  }
+
+  .board-detail-shell .board-header-title-wrap > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .board-detail-shell .board-header-title {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    font-size: 17px !important;
+    line-height: 1.08 !important;
+  }
+
+  .board-detail-shell .board-header-meta {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .board-detail-shell .pinboard-header-mirror > div > div:last-child {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    align-items: stretch !important;
+  }
+
+  .board-detail-shell .pinboard-header-mirror > div > div:last-child > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .board-detail-shell .pinboard-header-mirror .view-mode-switch,
+  .board-detail-shell .pinboard-header-mirror label.field {
+    grid-column: 1 / -1 !important;
+  }
+
+  .board-detail-shell .pinboard-header-mirror .view-mode-switch {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    overflow: hidden !important;
+  }
+
+  .board-detail-shell .pinboard-header-mirror .view-mode-button {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 0 8px !important;
+    justify-content: center !important;
+  }
+
+  .board-detail-shell .pinboard-header-mirror .view-mode-button span {
+    display: none !important;
+  }
+
+  .board-detail-shell .pinboard-header-mirror .field,
+  .board-detail-shell .pinboard-header-mirror .app-select,
+  .board-detail-shell .pinboard-header-mirror .btn-ghost,
+  .board-detail-shell .pinboard-header-mirror .btn-primary {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: 40px !important;
+    padding-inline: 10px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .board-detail-shell .pinboard-header-mirror .btn-ghost,
+  .board-detail-shell .pinboard-header-mirror .btn-primary {
+    justify-content: center !important;
+  }
+
+  .board-detail-shell .pinboard-header-mirror .btn-ghost span,
+  .board-detail-shell .pinboard-header-mirror .btn-primary span {
+    display: none !important;
+  }
+
+  .board-detail-shell .pinboard-header-mirror .btn-primary {
+    width: 100% !important;
+  }
+
+  .board-detail-shell .board-scroll {
+    flex: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow-x: clip !important;
+    overflow-y: visible !important;
+    padding: 12px 12px 96px !important;
+    box-sizing: border-box !important;
+  }
+
+  .section-stack,
+  .compact-section-stack,
+  .detailed-board-flow,
+  .pin-grid,
+  .pin-grid-detailed,
+  .compact-pin-list {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: clip !important;
+  }
+
+  .section-stack,
+  .compact-section-stack,
+  .detailed-board-flow {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+
+  .pin-grid,
+  .pin-grid-detailed {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px !important;
+  }
+
+  .section-panel,
+  .pin-card,
+  .empty-drop-zone,
+  .collapsed-drop-zone {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .section-header {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .section-title-button,
+  .section-title-button > span,
+  .section-title-text,
+  .section-subtitle {
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .section-title-text,
+  .section-subtitle {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .section-header .btn-ghost {
+    min-width: 0 !important;
+    max-width: 84px !important;
+    padding-inline: 10px !important;
+  }
+}
+
+@media (max-width: 430px) {
+  .board-detail-shell .pinboard-header-mirror > div > div:last-child {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  }
+}
