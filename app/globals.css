@@ -6357,3 +6357,369 @@ body {
   background: rgba(255,255,255,.52) !important;
   border-color: rgba(18,16,12,.12) !important;
 }
+
+/* ==========================================================
+   TARGETED PATCH: Superhive image picker support + mobile layout repair
+   Only responsive/mobile containment and existing editor/pinboard surfaces.
+   ========================================================== */
+html,
+body {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+}
+
+.image-picker-scroll,
+.image-picker-panel,
+.image-picker-empty {
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow-x: hidden !important;
+}
+
+.image-picker-grid {
+  max-width: 100% !important;
+  min-width: 0 !important;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)) !important;
+}
+
+.image-picker-tile,
+.image-picker-tile img {
+  max-width: 100% !important;
+}
+
+@media (max-width: 760px) {
+  .app-shell.board-detail-shell,
+  .board-detail-shell {
+    display: flex !important;
+    width: 100dvw !important;
+    max-width: 100dvw !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: hidden !important;
+  }
+
+  .board-detail-shell > aside {
+    display: none !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+  }
+
+  .board-detail-shell > section {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    padding-top: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  .board-detail-shell .pinboard-header-mirror,
+  .board-detail-shell .top-glass.pinboard-header-mirror {
+    position: sticky !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 10px max(10px, env(safe-area-inset-left)) !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  .board-detail-shell .pinboard-header-mirror > div {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: start !important;
+    gap: 8px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .board-detail-shell .board-header-title-wrap {
+    grid-column: 1 / 2 !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  .board-detail-shell .pinboard-header-back-link {
+    max-width: 92px !important;
+    min-height: 34px !important;
+    padding: 0 8px !important;
+    font-size: 10px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .board-detail-shell .board-header-title {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    font-size: 15px !important;
+    line-height: 1.05 !important;
+  }
+
+  .board-detail-shell .board-header-meta {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    font-size: 9px !important;
+    letter-spacing: .14em !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .board-detail-shell .pinboard-header-mirror > div > div:last-child {
+    grid-column: 1 / -1 !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .board-detail-shell .view-mode-switch {
+    grid-column: 1 / 2 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+  }
+  .board-detail-shell .view-mode-switch::-webkit-scrollbar { display: none !important; }
+
+  .board-detail-shell .view-mode-button {
+    min-width: 40px !important;
+    padding-inline: 9px !important;
+  }
+  .board-detail-shell .view-mode-button span { display: none !important; }
+
+  .board-detail-shell .pinboard-header-mirror label.field {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .board-detail-shell .pinboard-header-mirror .field,
+  .board-detail-shell .pinboard-header-mirror .app-select,
+  .board-detail-shell .pinboard-header-mirror .btn-ghost,
+  .board-detail-shell .pinboard-header-mirror .btn-primary {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: 40px !important;
+    white-space: nowrap !important;
+  }
+
+  .board-detail-shell .pinboard-header-mirror select.field,
+  .board-detail-shell .pinboard-header-mirror select.app-select {
+    width: 100% !important;
+  }
+
+  .board-detail-shell .pinboard-header-mirror .btn-primary {
+    grid-column: 2 / 3 !important;
+    grid-row: 1 / 2 !important;
+    width: 48px !important;
+    padding: 0 !important;
+    justify-content: center !important;
+  }
+  .board-detail-shell .pinboard-header-mirror .btn-primary span,
+  .board-detail-shell .pinboard-header-mirror .btn-primary:not(:has(svg)) {
+    font-size: 0 !important;
+  }
+  .board-detail-shell .pinboard-header-mirror .btn-primary svg { margin: 0 !important; }
+
+  .board-detail-shell .pinboard-header-mirror .btn-ghost:not(.pinboard-header-back-link) {
+    width: 44px !important;
+    padding: 0 !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+  }
+  .board-detail-shell .pinboard-header-mirror .btn-ghost:not(.pinboard-header-back-link) span,
+  .board-detail-shell .pinboard-header-mirror .btn-ghost:not(.pinboard-header-back-link) { font-size: 0; }
+  .board-detail-shell .pinboard-header-mirror .btn-ghost svg { flex: 0 0 auto !important; }
+
+  .board-detail-shell .board-scroll {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+    padding: 12px 12px 96px !important;
+  }
+
+  .section-stack,
+  .compact-section-stack,
+  .detailed-board-flow,
+  .pin-grid,
+  .pin-grid-detailed,
+  .compact-pin-list {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  .pin-grid,
+  .pin-grid-detailed {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .section-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+  }
+
+  .section-header {
+    min-width: 0 !important;
+    gap: 8px !important;
+    padding: 12px !important;
+  }
+
+  .section-title-button,
+  .section-title-button > span,
+  .section-title-text,
+  .section-subtitle {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .section-title-text,
+  .section-subtitle {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .section-icon-button,
+  .section-header .btn-ghost {
+    flex: 0 0 auto !important;
+  }
+
+  .pin-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .empty-drop-zone,
+  .collapsed-drop-zone {
+    min-height: 138px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .detailed-filter-row {
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    padding-bottom: 4px !important;
+  }
+
+  .modal-backdrop {
+    padding: 8px !important;
+    align-items: stretch !important;
+  }
+
+  .editor-glass-panel {
+    width: calc(100dvw - 16px) !important;
+    max-width: calc(100dvw - 16px) !important;
+    max-height: calc(100dvh - 16px) !important;
+    margin: auto !important;
+    overflow: hidden !important;
+  }
+
+  .editor-glass-panel header {
+    padding: 14px !important;
+  }
+
+  .editor-glass-panel header h2 {
+    max-width: calc(100dvw - 92px) !important;
+    font-size: 20px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .editor-glass-panel form {
+    display: block !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+
+  .editor-glass-panel aside,
+  .editor-glass-panel main {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    border-right: 0 !important;
+  }
+
+  .cover-dropzone {
+    min-height: 210px !important;
+  }
+  .cover-dropzone img {
+    min-height: 210px !important;
+  }
+
+  .destination-selector,
+  .pin-destination-selector,
+  .editor-glass-panel .grid,
+  .editor-glass-panel .field,
+  .editor-glass-panel input,
+  .editor-glass-panel textarea,
+  .editor-glass-panel select,
+  .editor-glass-panel .app-select {
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .editor-glass-panel footer {
+    position: sticky !important;
+    bottom: 0 !important;
+    background: rgba(5,7,8,.72) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(1.25) !important;
+    backdrop-filter: blur(18px) saturate(1.25) !important;
+    flex-wrap: wrap !important;
+  }
+
+  .image-picker-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    max-height: 240px !important;
+    overflow-y: auto !important;
+  }
+}
+
+@media (max-width: 430px) {
+  .board-detail-shell .pinboard-header-mirror > div > div:last-child {
+    grid-template-columns: minmax(0, 1fr) auto auto !important;
+  }
+  .board-detail-shell .pinboard-header-mirror .btn-ghost:not(.pinboard-header-back-link) {
+    width: 40px !important;
+  }
+  .section-header .btn-ghost {
+    min-width: 76px !important;
+    padding-inline: 10px !important;
+  }
+}
+@media (max-width: 760px) {
+  .board-detail-shell .pinboard-header-mirror .btn-primary {
+    font-size: 0 !important;
+    overflow: hidden !important;
+  }
+  .board-detail-shell .pinboard-header-mirror .btn-primary svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+}
