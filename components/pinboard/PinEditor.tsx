@@ -4,6 +4,7 @@ import { FormEvent, type ClipboardEvent, type DragEvent, useEffect, useMemo, use
 import { Eye, FileUp, ImagePlus, Link as LinkIcon, Loader2, Pipette, Sparkles, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/browser';
 import { autoTags, COLOR_PRESETS, inferMediaKind, normalizeOptionalUrl } from '@/lib/media';
+import { proxiedImageUrl } from '@/lib/remote-image';
 import { sanitizeTags } from '@/lib/tags';
 import { nextPosition } from '@/lib/position';
 import { Board, BoardSection, LinkPreview, Pin } from '@/lib/types';
@@ -233,7 +234,7 @@ export function PinEditor({ boardId, boards = [], sections, allSections, targetS
         cover_focus_y: json.cover_focus_y ?? current.cover_focus_y ?? 50
       }));
     } catch {
-      setDraft(current => current.image_url ? current : { ...current, image_url: imageUrl });
+      setDraft(current => current.image_url ? current : { ...current, image_url: proxiedImageUrl(imageUrl), image_path: '' });
     }
   }
 
@@ -261,7 +262,7 @@ export function PinEditor({ boardId, boards = [], sections, allSections, targetS
         media_kind: data.mediaKind,
         content_type: data.contentType || '',
         tags: current.tags || (tags.length ? tags.join(', ') : sanitizeTags(autoTags(`${data.title ?? ''} ${data.description ?? ''}`)).join(', ')),
-        image_url: current.image_url || previewImages[0] || current.image_url
+        image_url: current.image_url || (previewImages[0] ? proxiedImageUrl(previewImages[0]) : '') || current.image_url
       }));
       if (previewImages[0] && !draft.image_url) void cacheRemoteImage(previewImages[0]);
     } catch (event) {
@@ -303,7 +304,7 @@ export function PinEditor({ boardId, boards = [], sections, allSections, targetS
     } catch (event) {
       // Some sites block server-side image caching even though the image can be
       // displayed in the browser. Do not lose the user's selected cover.
-      setDraft(current => ({ ...current, image_url: imageUrl, image_path: '', cover_focus_x: current.cover_focus_x ?? 50, cover_focus_y: current.cover_focus_y ?? 50 }));
+      setDraft(current => ({ ...current, image_url: proxiedImageUrl(imageUrl), image_path: '', cover_focus_x: current.cover_focus_x ?? 50, cover_focus_y: current.cover_focus_y ?? 50 }));
       setError(event instanceof Error ? `${event.message} Das Bild wird vorerst direkt als Cover verwendet.` : 'Bild konnte nicht zwischengespeichert werden. Es wird direkt als Cover verwendet.');
     } finally {
       setUploading(false);
@@ -506,7 +507,7 @@ export function PinEditor({ boardId, boards = [], sections, allSections, targetS
               onDragLeave={handleCoverDrag}
               onDrop={handleCoverDrop}
             >
-              {draft.image_url ? <img src={draft.image_url} alt="Pin Vorschau" referrerPolicy="no-referrer" className="h-full min-h-[320px] w-full object-cover" style={{ objectPosition: `${draft.cover_focus_x ?? 50}% ${draft.cover_focus_y ?? 50}%` }} draggable={false} /> : <div className="text-center text-sm text-[var(--muted)]"><ImagePlus className="mx-auto mb-2" /> Bild hier ablegen oder Datei hochladen</div>}
+              {draft.image_url ? <img src={proxiedImageUrl(draft.image_url)} alt="Pin Vorschau" referrerPolicy="no-referrer" className="h-full min-h-[320px] w-full object-cover" style={{ objectPosition: `${draft.cover_focus_x ?? 50}% ${draft.cover_focus_y ?? 50}%` }} draggable={false} /> : <div className="text-center text-sm text-[var(--muted)]"><ImagePlus className="mx-auto mb-2" /> Bild hier ablegen oder Datei hochladen</div>}
               {coverDragActive && <div className="cover-dropzone-overlay"><ImagePlus /> Bild hier ablegen</div>}
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">

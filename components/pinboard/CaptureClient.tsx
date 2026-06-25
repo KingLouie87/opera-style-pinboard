@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Check, ExternalLink, Grid2X2, LogOut, Plus, Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabase/browser';
+import { proxiedImageUrl } from '@/lib/remote-image';
 import type { Board, BoardSection, Pin } from '@/lib/types';
 import { PinEditor } from './PinEditor';
 import { PinDestinationSelector } from './PinDestinationSelector';
@@ -126,7 +127,7 @@ export function CaptureClient({ boards, sections, pins, userEmail, initialUrl = 
             <p className="hero-eyebrow">Eingehende Daten</p>
             <h2>{sanitizeInitial(initialTitle) || 'Neue Website'}</h2>
             <p>{sanitizeInitial(initialDescription) || initialUrl || 'Keine URL übergeben. Öffne Capture über die Browsererweiterung oder das Bookmarklet.'}</p>
-            {initialImageUrl && <img src={initialImageUrl} alt="" className="capture-preview-image" />}
+            {initialImageUrl && <img src={proxiedImageUrl(initialImageUrl)} alt="" className="capture-preview-image" />}
             {initialUrl && <code>{initialUrl}</code>}
           </>
         )}

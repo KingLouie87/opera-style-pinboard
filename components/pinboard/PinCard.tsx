@@ -5,6 +5,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { FileText, GripVertical, MoreHorizontal, Play, Tag } from 'lucide-react';
 import { youtubeEmbed } from '@/lib/media';
 import { Pin } from '@/lib/types';
+import { proxiedImageUrl } from '@/lib/remote-image';
 
 type PinActions = {
   onOpen?: (pin: Pin) => void;
@@ -62,7 +63,7 @@ export function PinVisual({ pin, floating = false, mode = 'standard', sectionTit
       >
         {pin.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={pin.image_url} alt="" referrerPolicy="no-referrer" className="pin-cover-img" style={focusStyle} draggable={false} />
+          <img src={proxiedImageUrl(pin.image_url)} alt="" referrerPolicy="no-referrer" className="pin-cover-img" style={focusStyle} draggable={false} />
         ) : (
           <div className="pin-cover-placeholder">
             <FileText size={28} />
@@ -126,7 +127,7 @@ export function PinCard({ pin, onOpen, onPlay, onContext, mode = 'standard', sec
       >
         {selectionMode && <span className={`pin-select-indicator ${selected ? 'selected' : ''}`} aria-hidden="true">{selected ? '✓' : ''}</span>}
         <div className="compact-thumb">
-          {pin.image_url ? <img src={pin.image_url} alt="" referrerPolicy="no-referrer" style={{ objectPosition: `${pin.cover_focus_x ?? 50}% ${pin.cover_focus_y ?? 50}%` }} draggable={false} /> : <FileText size={18} />}
+          {pin.image_url ? <img src={proxiedImageUrl(pin.image_url)} alt="" referrerPolicy="no-referrer" style={{ objectPosition: `${pin.cover_focus_x ?? 50}% ${pin.cover_focus_y ?? 50}%` }} draggable={false} /> : <FileText size={18} />}
         </div>
         <div className="compact-pin-copy">
           <strong>{pin.title || pin.file_name || 'Unbenannter Pin'}</strong>

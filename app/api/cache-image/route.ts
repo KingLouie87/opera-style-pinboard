@@ -67,7 +67,16 @@ export async function POST(request: Request) {
   if (!userData.user) return NextResponse.json({ error: 'Nicht angemeldet.' }, { status: 401 });
 
   const body = schema.parse(await request.json());
-  const response = await safeFetch(body.imageUrl, { headers: { accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif' } });
+  const target = new URL(body.imageUrl);
+  const response = await safeFetch(body.imageUrl, {
+    headers: {
+      accept: 'image/avif,image/webp,image/apng,image/png,image/jpeg,image/gif,*/*;q=0.8',
+      referer: `${target.origin}/`,
+      'sec-fetch-dest': 'image',
+      'sec-fetch-mode': 'no-cors',
+      'sec-fetch-site': 'cross-site',
+    }
+  });
   if (!response.ok) return NextResponse.json({ error: 'Bild konnte nicht geladen werden.' }, { status: 400 });
   const contentType = response.headers.get('content-type') || 'image/jpeg';
   if (!contentType.startsWith('image/')) return NextResponse.json({ error: 'URL ist kein Bild.' }, { status: 400 });
