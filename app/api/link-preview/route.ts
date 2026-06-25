@@ -85,6 +85,15 @@ function isPotentialImageReference(value: string) {
   return hasImageishPath(lower);
 }
 
+function hasExplicitNonImageExtension(lower: string) {
+  try {
+    const pathname = new URL(lower).pathname.toLowerCase();
+    return /\.(?:html?|php|asp|aspx|css|js|mjs|json|xml|txt|pdf|zip|rar|7z|mp4|webm|mov|mp3|wav|woff2?|ttf|otf|eot)(?:$|[?#])/.test(pathname);
+  } catch {
+    return /\.(?:html?|php|asp|aspx|css|js|mjs|json|xml|txt|pdf|zip|rar|7z|mp4|webm|mov|mp3|wav|woff2?|ttf|otf|eot)(?:$|[?#])/.test(lower);
+  }
+}
+
 function isLikelyImageUrl(value: string) {
   const lower = unescapeUrlCandidate(value).toLowerCase();
   if (!/^https?:\/\//.test(lower)) return false;
@@ -101,10 +110,22 @@ function isLikelyImageUrl(value: string) {
   if (/\.(?:jpe?g|png|webp|avif|gif)(?:[?#].*)?$/i.test(lower)) return true;
 
   // Modern CDNs often return images through extensionless proxy routes.
-  if (/(?:cdn|images|image|media|assets|uploads|static|cloudinary|imgix|unsplash|akamai|fastly|shopify|wp-content|notion|behance|artstation)/i.test(lower) && hasImageishPath(lower)) return true;
-  if (/(?:[?&](?:format|fm|auto|fit|width|w|height|h|quality|q)=)/i.test(lower) && hasImageishPath(lower)) return true;
+  if (/(?:cdn|images|image|media|assets|uploads|static|cloudinary|imgix|unsplash|akamai|fastly|shopify|wp-content|notion|behance|artstation|ytimg|fbcdn|twimg)/i.test(lower) && hasImageishPath(lower)) return true;
+  if (/(?:[?&](?:format|fm|auto|fit|width|w|height|h|quality|q|url)=)/i.test(lower) && hasImageishPath(lower)) return true;
 
   return false;
+}
+
+function isImageContextCandidate(value: string) {
+  const lower = unescapeUrlCandidate(value).toLowerCase();
+  if (!/^https?:\/\//.test(lower)) return false;
+  if (lower.startsWith('data:') || lower.startsWith('blob:')) return false;
+  if (hasExplicitNonImageExtension(lower)) return false;
+  if (/(?:analytics|tracking|pixel|doubleclick|googletagmanager|facebook\.com\/tr|stats|beacon)/i.test(lower)) return false;
+  // Values from og:image, img/srcset, picture/source and JSON-LD image are
+  // already image-context values. Do not require a classic image extension,
+  // otherwise modern CDN/proxy image URLs are dropped before the UI can show them.
+  return true;
 }
 
 function collectJsonImages(
@@ -191,7 +212,8 @@ function collectHtmlImageUrls(
   const rawPatterns = [
     /https?:\/\/assets\.superhivemarket\.com\/[^"'<>,\s)\]\}]+/gi,
     /https?:\/\/[^"'<>,\s)\]\}]+\.(?:jpe?g|png|webp|avif|gif)(?:\?[^"'<>,\s)\]\}]*)?/gi,
-    /https?:\/\/[^"'<>,\s)\]\}]+\/(?:store\/productimage|store\/product|cdn-cgi\/image|image|images|media|uploads|assets|gallery)\/[^"'<>,\s)\]\}]+/gi,
+    /https?:\/\/[^"'<>,\s)\]\}]+\/(?:store\/productimage|store\/product|cdn-cgi\/image|image|images|img|media|uploads|assets|gallery|photos|pictures|wp-content|cdn)\/[^"'<>,\s)\]\}]+/gi,
+    /https?:\/\/[^"'<>,\s)\]\}]+(?:[?&](?:format|fm|auto|fit|width|w|height|h|quality|q|url)=)[^"'<>,\s)\]\}]+/gi,
     /\/[^"'<>,\s)\]\}]+\.(?:jpe?g|png|webp|avif|gif)(?:\?[^"'<>,\s)\]\}]*)?/gi,
   ];
   for (const pattern of rawPatterns) {
@@ -259,7 +281,7 @@ function collectPreviewImages(
     if (
       absolute &&
       looksUseful(absolute, width, height) &&
-      isLikelyImageUrl(absolute) &&
+      isImageContextCandidate(absolute) &&
       !images.includes(absolute)
     )
       images.push(absolute);
@@ -273,7 +295,10 @@ function collectPreviewImages(
     'meta[name="twitter:image"]',
     'meta[name="twitter:image:src"]',
     'meta[name="thumbnail"]',
+    'meta[name="thumbnailUrl"]',
     'meta[itemprop="image"]',
+    'meta[itemprop="thumbnailUrl"]',
+    'meta[itemprop="contentUrl"]',
   ];
   const ogWidth = $('meta[property="og:image:width"]').attr("content");
   const ogHeight = $('meta[property="og:image:height"]').attr("content");
@@ -282,7 +307,7 @@ function collectPreviewImages(
   $('link[rel]').each((_, element) => {
     const rel = ($(element).attr('rel') ?? '').toLowerCase();
     const as = ($(element).attr('as') ?? '').toLowerCase();
-    if (rel.includes('image_src') || (rel.includes('preload') && as === 'image') || rel.includes('apple-touch-icon')) {
+    if (rel.includes('image_src') || (rel.includes('preload') && as === 'image') || rel.includes('apple-touch-icon') || rel.includes('icon')) {
       push($(element).attr('href'));
     }
   });
@@ -291,7 +316,7 @@ function collectPreviewImages(
     const img = $(element);
     const width = img.attr("width") || img.attr("data-width");
     const height = img.attr("height") || img.attr("data-height");
-    ["src", "data-src", "data-lazy-src", "data-original", "data-zoom", "data-image", "data-full", "data-large", "data-bg", "data-background", "poster"].forEach((attr) => push(img.attr(attr), width, height));
+    ["src", "data-src", "data-lazy-src", "data-original", "data-zoom", "data-image", "data-full", "data-large", "data-bg", "data-background", "data-thumb", "data-thumbnail", "data-cover", "data-poster", "poster"].forEach((attr) => push(img.attr(attr), width, height));
     for (const src of srcsetUrls(img.attr("srcset"))) push(src, width, height);
     for (const src of srcsetUrls(img.attr("data-srcset"))) push(src, width, height);
   });
@@ -320,6 +345,17 @@ function collectPreviewImages(
     collectJsonImages(parsed, push);
   });
   collectHtmlImageUrls(html, push);
+
+  // Last-resort pass: many app shells store image candidates in generic meta
+  // attributes or data-* attributes. Keep this bounded by the same image-context
+  // filter, but do not require a file extension.
+  $('meta[content], [data-image], [data-src], [data-bg], [data-background], [data-thumbnail], [data-cover]').each((_, element) => {
+    const node = $(element);
+    ['content', 'data-image', 'data-src', 'data-bg', 'data-background', 'data-thumbnail', 'data-cover'].forEach((attr) => {
+      const value = node.attr(attr);
+      if (value && isPotentialImageReference(value)) push(value);
+    });
+  });
 
   if (isSuperhive(target)) knownSuperhiveImages(target).forEach((image) => push(image));
   return sortImageCandidates(images);
