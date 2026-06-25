@@ -24,7 +24,7 @@ export function PinDetailModal({ pin, onClose, onEdit, onPlay }: { pin: Pin; onC
         <div className={`detail-grid min-h-0 ${hasImage ? 'detail-grid-with-image' : 'detail-grid-no-image'}`}>
           {hasImage && (
             <div className="detail-media">
-              <img src={pin.image_url!} alt="" style={{ objectPosition: `${pin.cover_focus_x ?? 50}% ${pin.cover_focus_y ?? 50}%` }} />
+              <img src={pin.image_url!} alt="" referrerPolicy="no-referrer" style={{ objectPosition: `${pin.cover_focus_x ?? 50}% ${pin.cover_focus_y ?? 50}%` }} />
               {isVideo && <button type="button" onClick={() => onPlay?.(pin)} className="detail-play"><Play size={21} fill="currentColor" /> Video abspielen</button>}
             </div>
           )}

@@ -39,40 +39,72 @@ function absoluteUrl(value: string | undefined | null, base: URL) {
 
 function srcsetUrls(value: string | undefined | null) {
   if (!value) return [];
-  return value
-    .split(",")
-    .map((part) => part.trim().split(/\s+/)[0])
-    .filter(Boolean);
+  const input = unescapeUrlCandidate(value);
+  const candidates: string[] = [];
+  for (const part of input.split(/\s*,\s*/)) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const first = trimmed.split(/\s+/)[0];
+    if (first && !first.startsWith('data:')) candidates.push(first);
+  }
+  return candidates;
+}
+
+function stripWrappingQuotes(value: string) {
+  return value.replace(/^[\\"'`\s]+|[\\"'`\s]+$/g, '');
 }
 
 function unescapeUrlCandidate(value: string) {
-  return value
-    .replace(/\\u0026/g, "&")
-    .replace(/\\u002F/g, "/")
+  let cleaned = stripWrappingQuotes(value)
+    .replace(/\\u0026/gi, "&")
+    .replace(/\\u002F/gi, "/")
     .replace(/\\\//g, "/")
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&#x27;/g, "'")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#x27;/gi, "'")
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
     .trim();
+  try {
+    // Some modern app shells embed image URLs URL-encoded inside JSON strings.
+    if (/%(?:2f|3a|3f|26|3d)/i.test(cleaned)) cleaned = decodeURIComponent(cleaned);
+  } catch {}
+  return stripWrappingQuotes(cleaned);
+}
+
+function hasImageishPath(lower: string) {
+  return /(?:^|[\/_\-.?=&])(image|images|img|media|asset|assets|upload|uploads|photo|photos|picture|thumbnail|thumb|cover|poster|gallery|productimage|product-image|store\/product|cdn-cgi\/image|xlarge|large|webp|jpeg|jpg|png|avif)(?:$|[\/_\-.?=&])/i.test(lower);
+}
+
+function isPotentialImageReference(value: string) {
+  const lower = unescapeUrlCandidate(value).toLowerCase();
+  if (!lower || lower.startsWith('data:') || lower.startsWith('blob:')) return false;
+  if (/\.(?:jpe?g|png|webp|avif|gif)(?:[?#].*)?$/i.test(lower)) return true;
+  if (/^(?:https?:)?\/\//.test(lower) || lower.startsWith('/')) return hasImageishPath(lower);
+  return hasImageishPath(lower);
 }
 
 function isLikelyImageUrl(value: string) {
-  const lower = value.toLowerCase();
+  const lower = unescapeUrlCandidate(value).toLowerCase();
   if (!/^https?:\/\//.test(lower)) return false;
+
   if (
     lower.includes("assets.superhivemarket.com/store/product/") ||
     lower.includes("assets.superhivemarket.com/store/productimage/") ||
-    lower.includes("assets.superhivemarket.com/cache/")
-  )
-    return true;
-  if (lower.includes("superhivemarket.com") && /\/(?:image|images|productimage|cache)\//.test(lower))
-    return true;
-  if (lower.includes("blendermarket.com") && /\/image\//.test(lower))
-    return true;
-  return (
-    /\.(?:jpe?g|png|webp|avif)(?:[?#].*)?$/i.test(lower) ||
-    /(?:image|thumbnail|thumb|xlarge|large|gallery)/i.test(lower)
-  );
+    lower.includes("assets.superhivemarket.com/cache/") ||
+    lower.includes("superhivemarket.com") && /\/(?:image|images|productimage|cache|store\/product)\//.test(lower)
+  ) return true;
+
+  if (lower.includes("blendermarket.com") && /\/(?:image|images|productimage|files)\//.test(lower)) return true;
+
+  if (/\.(?:jpe?g|png|webp|avif|gif)(?:[?#].*)?$/i.test(lower)) return true;
+
+  // Modern CDNs often return images through extensionless proxy routes.
+  if (/(?:cdn|images|image|media|assets|uploads|static|cloudinary|imgix|unsplash|akamai|fastly|shopify|wp-content|notion|behance|artstation)/i.test(lower) && hasImageishPath(lower)) return true;
+  if (/(?:[?&](?:format|fm|auto|fit|width|w|height|h|quality|q)=)/i.test(lower) && hasImageishPath(lower)) return true;
+
+  return false;
 }
 
 function collectJsonImages(
@@ -87,7 +119,7 @@ function collectJsonImages(
   if (depth > 10 || value == null) return;
   if (typeof value === "string") {
     const cleaned = unescapeUrlCandidate(value);
-    if (isLikelyImageUrl(cleaned)) push(cleaned);
+    if (isPotentialImageReference(cleaned)) push(cleaned);
     return;
   }
   if (Array.isArray(value)) {
@@ -111,7 +143,7 @@ function collectJsonImages(
         /(image|thumbnail|contenturl|url|src|poster)/.test(lower)
       ) {
         const cleaned = unescapeUrlCandidate(item);
-        if (isLikelyImageUrl(cleaned)) push(cleaned, width, height);
+        if (isPotentialImageReference(cleaned)) push(cleaned, width, height);
       } else {
         collectJsonImages(item, push, depth + 1);
       }
@@ -151,18 +183,61 @@ function collectHtmlImageUrls(
   ) => void,
 ) {
   const normalized = html
-    .replace(/\\u0026/g, "&")
-    .replace(/\\u002F/g, "/")
-    .replace(/\\\//g, "/");
-  const patterns = [
-    /https?:\/\/assets\.superhivemarket\.com\/[^"'<>\s)\]\}]+/gi,
-    /https?:\/\/[^"'<>\s)\]\}]+\.(?:jpe?g|png|webp|avif|gif)(?:\?[^"'<>\s)\]\}]*)?/gi,
-    /https?:\/\/[^"'<>\s)\]\}]+\/(?:store\/productimage|store\/product|cache)\/[^"'<>\s)\]\}]+/gi,
+    .replace(/\\u0026/gi, "&")
+    .replace(/\\u002F/gi, "/")
+    .replace(/\\\//g, "/")
+    .replace(/&amp;/gi, "&");
+
+  const rawPatterns = [
+    /https?:\/\/assets\.superhivemarket\.com\/[^"'<>,\s)\]\}]+/gi,
+    /https?:\/\/[^"'<>,\s)\]\}]+\.(?:jpe?g|png|webp|avif|gif)(?:\?[^"'<>,\s)\]\}]*)?/gi,
+    /https?:\/\/[^"'<>,\s)\]\}]+\/(?:store\/productimage|store\/product|cdn-cgi\/image|image|images|media|uploads|assets|gallery)\/[^"'<>,\s)\]\}]+/gi,
+    /\/[^"'<>,\s)\]\}]+\.(?:jpe?g|png|webp|avif|gif)(?:\?[^"'<>,\s)\]\}]*)?/gi,
   ];
-  for (const pattern of patterns) {
+  for (const pattern of rawPatterns) {
     const matches = normalized.match(pattern) ?? [];
     matches.forEach((match) => push(unescapeUrlCandidate(match)));
   }
+
+  // Extract image-ish string values from large app state objects where the
+  // surrounding script is not valid JSON by itself.
+  const keyValuePatterns = [
+    /["'](?:image|images|thumbnail|thumbnailUrl|contentUrl|src|srcset|poster|cover|url)["']\s*:\s*["']([^"']+)["']/gi,
+    /(?:image|thumbnail|contentUrl|src|srcset|poster|cover)\s*=\s*["']([^"']+)["']/gi,
+  ];
+  for (const pattern of keyValuePatterns) {
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(normalized))) {
+      const candidate = unescapeUrlCandidate(match[1]);
+      if (isPotentialImageReference(candidate)) {
+        if (candidate.includes(',')) srcsetUrls(candidate).forEach((src) => push(src));
+        else push(candidate);
+      }
+    }
+  }
+}
+
+function imageScore(url: string, index: number) {
+  const lower = url.toLowerCase();
+  let score = Math.max(0, 200 - index);
+  if (lower.includes('og')) score += 70;
+  if (lower.includes('twitter')) score += 35;
+  if (lower.includes('product')) score += 60;
+  if (lower.includes('gallery')) score += 45;
+  if (lower.includes('hero') || lower.includes('cover')) score += 40;
+  if (lower.includes('xlarge') || lower.includes('large') || /(?:[?&](?:w|width)=)(?:9|1\d)\d{2}/.test(lower)) score += 30;
+  if (lower.includes('assets.superhivemarket.com/store/product')) score += 120;
+  if (lower.includes('/store/productimage/')) score += 110;
+  if (lower.includes('avatar') || lower.includes('icon') || lower.includes('logo') || lower.includes('sprite')) score -= 100;
+  if (lower.includes('favicon') || lower.endsWith('.svg')) score -= 150;
+  return score;
+}
+
+function sortImageCandidates(images: string[]) {
+  return images
+    .map((url, index) => ({ url, score: imageScore(url, index) }))
+    .sort((a, b) => b.score - a.score)
+    .map((item) => item.url);
 }
 
 function collectPreviewImages(
@@ -190,39 +265,41 @@ function collectPreviewImages(
       images.push(absolute);
   };
 
-  push(
-    $('meta[property="og:image:secure_url"]').attr("content"),
-    $('meta[property="og:image:width"]').attr("content"),
-    $('meta[property="og:image:height"]').attr("content"),
-  );
-  push(
-    $('meta[property="og:image"]').attr("content"),
-    $('meta[property="og:image:width"]').attr("content"),
-    $('meta[property="og:image:height"]').attr("content"),
-  );
-  push($('meta[name="twitter:image"]').attr("content"));
-  push($('meta[name="twitter:image:src"]').attr("content"));
-  push($('link[rel="image_src"]').attr("href"));
-  push($('link[rel="preload"][as="image"]').attr("href"));
+  const metaImageSelectors = [
+    'meta[property="og:image:secure_url"]',
+    'meta[property="og:image:url"]',
+    'meta[property="og:image"]',
+    'meta[name="og:image"]',
+    'meta[name="twitter:image"]',
+    'meta[name="twitter:image:src"]',
+    'meta[name="thumbnail"]',
+    'meta[itemprop="image"]',
+  ];
+  const ogWidth = $('meta[property="og:image:width"]').attr("content");
+  const ogHeight = $('meta[property="og:image:height"]').attr("content");
+  metaImageSelectors.forEach((selector) => push($(selector).attr("content"), ogWidth, ogHeight));
+
+  $('link[rel]').each((_, element) => {
+    const rel = ($(element).attr('rel') ?? '').toLowerCase();
+    const as = ($(element).attr('as') ?? '').toLowerCase();
+    if (rel.includes('image_src') || (rel.includes('preload') && as === 'image') || rel.includes('apple-touch-icon')) {
+      push($(element).attr('href'));
+    }
+  });
 
   $("img").each((_, element) => {
     const img = $(element);
     const width = img.attr("width") || img.attr("data-width");
     const height = img.attr("height") || img.attr("data-height");
-    push(img.attr("src"), width, height);
-    push(img.attr("data-src"), width, height);
-    push(img.attr("data-lazy-src"), width, height);
-    push(img.attr("data-original"), width, height);
-    push(img.attr("data-zoom"), width, height);
-    push(img.attr("data-image"), width, height);
+    ["src", "data-src", "data-lazy-src", "data-original", "data-zoom", "data-image", "data-full", "data-large", "data-bg", "data-background", "poster"].forEach((attr) => push(img.attr(attr), width, height));
     for (const src of srcsetUrls(img.attr("srcset"))) push(src, width, height);
-    for (const src of srcsetUrls(img.attr("data-srcset")))
-      push(src, width, height);
+    for (const src of srcsetUrls(img.attr("data-srcset"))) push(src, width, height);
   });
 
-  $("source").each((_, element) =>
-    srcsetUrls($(element).attr("srcset")).forEach((src) => push(src)),
-  );
+  $("source").each((_, element) => {
+    srcsetUrls($(element).attr("srcset")).forEach((src) => push(src));
+    srcsetUrls($(element).attr("data-srcset")).forEach((src) => push(src));
+  });
   $("a[href]").each((_, element) => {
     const href = $(element).attr("href");
     if (href && isLikelyImageUrl(absoluteUrl(href, pageBase) ?? href))
@@ -237,37 +314,15 @@ function collectPreviewImages(
   });
 
   $(
-    'script[type="application/ld+json"], script#__NEXT_DATA__, script[data-json], script[type="application/json"]',
+    'script[type="application/ld+json"], script#__NEXT_DATA__, script#__NUXT_DATA__, script[data-json], script[type="application/json"]',
   ).each((_, element) => {
     const parsed = parseJsonMaybe($(element).text());
     collectJsonImages(parsed, push);
   });
   collectHtmlImageUrls(html, push);
 
-  if (isSuperhive(target)) {
-    knownSuperhiveImages(target).forEach((image) => push(image));
-    images.sort((a, b) => {
-      const score = (url: string) => {
-        const lower = url.toLowerCase();
-        let value = 0;
-        if (lower.includes("assets.superhivemarket.com/store/product/"))
-          value += 40;
-        if (lower.includes("/image/")) value += 30;
-        if (lower.includes("xlarge_og") || lower.includes("xlarge"))
-          value += 18;
-        if (lower.includes("large")) value += 10;
-        if (
-          lower.includes("avatar") ||
-          lower.includes("icon") ||
-          lower.includes("logo")
-        )
-          value -= 25;
-        return value;
-      };
-      return score(b) - score(a);
-    });
-  }
-  return images;
+  if (isSuperhive(target)) knownSuperhiveImages(target).forEach((image) => push(image));
+  return sortImageCandidates(images);
 }
 
 function looksUseful(url: string, width?: string, height?: string) {
@@ -398,7 +453,8 @@ function previewFallback(
   contentType: string | null = null,
   images: string[] = [],
 ) {
-  const fallbackImages = Array.from(new Set([...images, ...knownSuperhiveImages(target)])).filter((image) => looksUseful(image));
+  const directImage = isLikelyImageUrl(target.toString()) ? [target.toString()] : [];
+  const fallbackImages = Array.from(new Set([...images, ...directImage, ...knownSuperhiveImages(target)])).filter((image) => looksUseful(image) && isLikelyImageUrl(image));
   const cleanDisplayUrl = new URL(target.toString());
   cleanDisplayUrl.search = "";
   cleanDisplayUrl.hash = "";
@@ -426,6 +482,16 @@ function previewFallback(
 
 async function fetchWithFallbacks(target: URL) {
   const candidates: URL[] = [target];
+  if (!target.hostname.startsWith('www.')) {
+    const withWww = new URL(target.toString());
+    withWww.hostname = `www.${target.hostname}`;
+    candidates.push(withWww);
+  }
+  if (target.hostname.startsWith('www.')) {
+    const withoutWww = new URL(target.toString());
+    withoutWww.hostname = target.hostname.replace(/^www\./, '');
+    candidates.push(withoutWww);
+  }
   if (target.search) {
     const withoutTracking = new URL(target.toString());
     for (const key of Array.from(withoutTracking.searchParams.keys())) {
@@ -567,16 +633,7 @@ export async function POST(request: Request) {
             null;
           const title = cleanPreviewTitle(rawTitle, target);
           const description = cleanPreviewDescription(rawDescription);
-          const images: string[] = [];
-          const push = (value: string | undefined | null) => {
-            const absolute = absoluteUrl(value, target);
-            if (absolute && looksUseful(absolute) && !images.includes(absolute))
-              images.push(absolute);
-          };
-          push($('meta[property="og:image:secure_url"]').attr("content"));
-          push($('meta[property="og:image"]').attr("content"));
-          push($('meta[name="twitter:image"]').attr("content"));
-          push($('link[rel="image_src"]').attr("href"));
+          const images = collectPreviewImages($, html, target, target);
           const favicon =
             absoluteUrl(
               $('link[rel="apple-touch-icon"]').attr("href"),
@@ -617,18 +674,19 @@ export async function POST(request: Request) {
       !contentType.includes("text/html") &&
       !contentType.includes("application/xhtml")
     ) {
+      const directImages = contentType.startsWith("image/") || isLikelyImageUrl(target.toString()) ? [target.toString()] : [];
       return NextResponse.json({
         url: target.toString(),
         title: niceTitleFromUrl(target),
         description: null,
         favicon: absoluteUrl("/favicon.ico", target),
         source: sourceName(target),
-        mediaKind: mediaKindFromHeader,
+        mediaKind: directImages.length ? "image" : mediaKindFromHeader,
         contentType,
         suggestedTags: autoTags(
           `${sourceName(target)} ${target.pathname}`,
         ).slice(0, 7),
-        images: [],
+        images: directImages,
         videoEmbedUrl: youtubeEmbed(target.toString()),
       });
     }

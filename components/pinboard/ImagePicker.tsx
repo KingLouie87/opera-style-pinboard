@@ -33,7 +33,7 @@ export function ImagePicker({ images, selected, disabled, onSelect }: { images: 
               aria-pressed={isSelected}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={image} alt="" loading="lazy" />
+              <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" />
               <span className="image-picker-state">{isSelected ? <><Check size={13} /> Ausgewählt</> : 'Verwenden'}</span>
             </button>
           );

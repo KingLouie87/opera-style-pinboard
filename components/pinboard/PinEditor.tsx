@@ -248,8 +248,10 @@ export function PinEditor({ boardId, boards = [], sections, allSections, targetS
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Preview fehlgeschlagen.');
       const data = json as LinkPreview;
-      setPreview(data);
-      const tags = sanitizeTags([...(tagList.length ? tagList : []), ...data.suggestedTags]);
+      const previewImages = Array.from(new Set([...(Array.isArray(data.images) ? data.images : []), ...(initialImageUrl ? [initialImageUrl] : [])]));
+      const nextPreview = { ...data, images: previewImages };
+      setPreview(nextPreview);
+      const tags = sanitizeTags([...(tagList.length ? tagList : []), ...(data.suggestedTags ?? [])]);
       setDraft(current => ({
         ...current,
         url: data.url,
@@ -259,9 +261,9 @@ export function PinEditor({ boardId, boards = [], sections, allSections, targetS
         media_kind: data.mediaKind,
         content_type: data.contentType || '',
         tags: current.tags || (tags.length ? tags.join(', ') : sanitizeTags(autoTags(`${data.title ?? ''} ${data.description ?? ''}`)).join(', ')),
-        image_url: current.image_url || data.images[0] || current.image_url
+        image_url: current.image_url || previewImages[0] || current.image_url
       }));
-      if (data.images[0] && !draft.image_url) void cacheRemoteImage(data.images[0]);
+      if (previewImages[0] && !draft.image_url) void cacheRemoteImage(previewImages[0]);
     } catch (event) {
       const fallbackDomain = (() => {
         try { return new URL(normalized).hostname.replace(/^www\./, ''); } catch { return ''; }
@@ -299,7 +301,10 @@ export function PinEditor({ boardId, boards = [], sections, allSections, targetS
       if (!response.ok) throw new Error(json.error || 'Bild konnte nicht gespeichert werden.');
       setDraft(current => ({ ...current, image_url: json.image_url, image_path: json.image_path, dominant_color: json.dominant_color || current.dominant_color, color: current.color || json.dominant_color || current.color, aspect_ratio: json.aspect_ratio || current.aspect_ratio, cover_focus_x: json.cover_focus_x ?? current.cover_focus_x ?? 50, cover_focus_y: json.cover_focus_y ?? current.cover_focus_y ?? 50 }));
     } catch (event) {
-      setError(event instanceof Error ? event.message : 'Bild konnte nicht gespeichert werden.');
+      // Some sites block server-side image caching even though the image can be
+      // displayed in the browser. Do not lose the user's selected cover.
+      setDraft(current => ({ ...current, image_url: imageUrl, image_path: '', cover_focus_x: current.cover_focus_x ?? 50, cover_focus_y: current.cover_focus_y ?? 50 }));
+      setError(event instanceof Error ? `${event.message} Das Bild wird vorerst direkt als Cover verwendet.` : 'Bild konnte nicht zwischengespeichert werden. Es wird direkt als Cover verwendet.');
     } finally {
       setUploading(false);
     }
@@ -501,7 +506,7 @@ export function PinEditor({ boardId, boards = [], sections, allSections, targetS
               onDragLeave={handleCoverDrag}
               onDrop={handleCoverDrop}
             >
-              {draft.image_url ? <img src={draft.image_url} alt="Pin Vorschau" className="h-full min-h-[320px] w-full object-cover" style={{ objectPosition: `${draft.cover_focus_x ?? 50}% ${draft.cover_focus_y ?? 50}%` }} draggable={false} /> : <div className="text-center text-sm text-[var(--muted)]"><ImagePlus className="mx-auto mb-2" /> Bild hier ablegen oder Datei hochladen</div>}
+              {draft.image_url ? <img src={draft.image_url} alt="Pin Vorschau" referrerPolicy="no-referrer" className="h-full min-h-[320px] w-full object-cover" style={{ objectPosition: `${draft.cover_focus_x ?? 50}% ${draft.cover_focus_y ?? 50}%` }} draggable={false} /> : <div className="text-center text-sm text-[var(--muted)]"><ImagePlus className="mx-auto mb-2" /> Bild hier ablegen oder Datei hochladen</div>}
               {coverDragActive && <div className="cover-dropzone-overlay"><ImagePlus /> Bild hier ablegen</div>}
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
