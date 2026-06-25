@@ -10,6 +10,7 @@ import { MobileNav } from '@/components/pinboard/MobileNav';
 import { ContextMenu } from '@/components/pinboard/ContextMenu';
 import { ConfirmDialog } from '@/components/pinboard/ConfirmDialog';
 import { RenameDialog } from '@/components/pinboard/RenameDialog';
+import { RemoteImage } from '@/components/pinboard/RemoteImage';
 
 type Props = { boards: Board[]; userEmail: string };
 type BoardContext = null | { board: Board; x: number; y: number };
@@ -366,8 +367,7 @@ export function BoardDashboard({ boards: initialBoards, userEmail }: Props) {
                     className={`board-gallery-card board-gallery-card-fixed ${draggingBoardId === board.id ? 'board-card-dragging' : ''}`}
                   >
                     {board.cover_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={board.cover_url} alt="" className="board-gallery-img" draggable={false} />
+                      <RemoteImage src={board.cover_url} alt="" className="board-gallery-img" draggable={false} />
                     ) : (
                       <div className="board-gallery-material" />
                     )}

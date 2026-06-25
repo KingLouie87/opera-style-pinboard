@@ -6984,3 +6984,21 @@ body {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
   }
 }
+
+/* Image analysis/display hardening: keep picker tiles clean while remote/proxy images load. */
+.image-picker-tile { position: relative; }
+.image-picker-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255,255,255,0.10), transparent 34%),
+    linear-gradient(135deg, rgba(255,255,255,0.055), rgba(255,255,255,0.018));
+}
+.image-picker-tile img {
+  position: relative;
+  z-index: 1;
+  transition: opacity .18s ease, transform .22s ease;
+}
+.image-picker-state { z-index: 2; }

@@ -24,7 +24,7 @@ import { Archive, ArrowDown, ArrowLeft, ArrowUp, CheckSquare, ChevronDown, Chevr
 import { Board, BoardSection, Pin } from '@/lib/types';
 import { createClient } from '@/lib/supabase/browser';
 import { nextPosition, normalizePositions } from '@/lib/position';
-import { proxiedImageUrl } from '@/lib/remote-image';
+import { RemoteImage } from './RemoteImage';
 import { PinCard, PinOverlay } from './PinCard';
 import { PinEditor } from './PinEditor';
 import { BoardSettingsPanel } from './BoardSettingsPanel';
@@ -204,7 +204,7 @@ function BoardSectionPanel({ group, onAdd, onToggle, onRename, onContext, active
         ) : (
           <>
             <div className="hidden items-center gap-1 md:flex">
-              {group.collapsed && preview.map(pin => <img key={pin.id} src={proxiedImageUrl(pin.image_url)} alt="" className="h-8 w-8 rounded-[5px] border border-white/10 object-cover" />)}
+              {group.collapsed && preview.map(pin => <RemoteImage key={pin.id} src={pin.image_url} pageUrl={pin.url} alt="" className="h-8 w-8 rounded-[5px] border border-white/10 object-cover" />)}
             </div>
             {!group.isInbox && <button type="button" onClick={openOptions} className="section-icon-button section-options-button" aria-label="Teilbereich Optionen"><Settings size={15} /></button>}
             <button type="button" onClick={() => onAdd(group.id)} className="btn-ghost h-9 px-3 text-sm"><Plus size={15} /> Pin</button>
@@ -699,7 +699,7 @@ export function PinboardClient({ board, initialSections, initialPins, userEmail 
         <div className="side-glass flex min-h-0 flex-1 flex-col">
           <Link href="/boards" className="top-back-link mb-3"><ArrowLeft size={16} /> Alle Boards</Link>
           <div className="board-side-cover">
-            {currentBoard.cover_url && <img src={currentBoard.cover_url} alt="" />}
+            {currentBoard.cover_url && <RemoteImage src={currentBoard.cover_url} alt="" />}
             <div>
               <p>Pinboard</p>
               <h1>{currentBoard.title}</h1>

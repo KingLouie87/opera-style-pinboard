@@ -3,7 +3,7 @@
 import { FormEvent, useState } from 'react';
 import { ImagePlus, Save, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/browser';
-import { proxiedImageUrl } from '@/lib/remote-image';
+import { RemoteImage } from './RemoteImage';
 import { Board, Pin } from '@/lib/types';
 
 async function compressCover(file: File) {
@@ -67,10 +67,10 @@ export function BoardSettingsPanel({ board, pins, onClose, onSaved }: { board: B
         </header>
         <main className="board-scroll flex-1 space-y-5 overflow-y-auto p-5">
           <div className="grid min-h-64 place-items-center overflow-hidden rounded-[8px] border border-dashed border-[var(--line)] bg-black/20">
-            {coverUrl ? <img src={proxiedImageUrl(coverUrl)} alt="Board Cover" className="h-full min-h-64 w-full object-cover" /> : <div className="text-center text-sm text-[var(--muted)]"><ImagePlus className="mx-auto mb-2" /> Kein Board-Cover</div>}
+            {coverUrl ? <RemoteImage src={coverUrl} alt="Board Cover" className="h-full min-h-64 w-full object-cover" /> : <div className="text-center text-sm text-[var(--muted)]"><ImagePlus className="mx-auto mb-2" /> Kein Board-Cover</div>}
           </div>
           <div className="grid gap-2 sm:grid-cols-2"><label className="btn-ghost cursor-pointer px-3 py-3 text-center text-sm font-semibold">Cover hochladen<input type="file" accept="image/*" className="hidden" onChange={event => event.target.files?.[0] && uploadCover(event.target.files[0])} /></label><button type="button" onClick={() => { setCoverUrl(''); setCoverPath(''); }} className="btn-ghost px-3 py-3 text-sm font-semibold">Cover entfernen</button></div>
-          {!!pinImages.length && <section><p className="mb-2 text-sm font-semibold text-[var(--text-soft)]">Aus Pin-Bildern wählen</p><div className="grid grid-cols-6 gap-2">{pinImages.map(image => <button key={image} type="button" onClick={() => { setCoverUrl(image); setCoverPath(''); }} className="h-16 overflow-hidden rounded-[6px] border border-[var(--line)]"><img src={proxiedImageUrl(image)} alt="" className="h-full w-full object-cover" /></button>)}</div></section>}
+          {!!pinImages.length && <section><p className="mb-2 text-sm font-semibold text-[var(--text-soft)]">Aus Pin-Bildern wählen</p><div className="grid grid-cols-6 gap-2">{pinImages.map(image => <button key={image} type="button" onClick={() => { setCoverUrl(image); setCoverPath(''); }} className="h-16 overflow-hidden rounded-[6px] border border-[var(--line)]"><RemoteImage src={image} alt="" className="h-full w-full object-cover" /></button>)}</div></section>}
           <label className="block text-sm font-medium text-[var(--text-soft)]">Titel<input value={title} onChange={event => setTitle(event.target.value)} className="field mt-2" /></label>
           <label className="block text-sm font-medium text-[var(--text-soft)]">Beschreibung<textarea value={description} onChange={event => setDescription(event.target.value)} className="field mt-2 min-h-24 resize-y" /></label>
           {error && <p className="rounded-[8px] border border-red-400/20 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}

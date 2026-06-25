@@ -2,11 +2,11 @@ import { NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
-import { safeFetch } from '@/lib/url-security';
+import { fetchPublicImage } from '@/lib/server-image';
 
 export const runtime = 'nodejs';
 
-const schema = z.object({ imageUrl: z.string().url() });
+const schema = z.object({ imageUrl: z.string().url(), pageUrl: z.string().url().optional().nullable() });
 
 function clampPercent(value: number) {
   if (!Number.isFinite(value)) return 50;
@@ -67,23 +67,9 @@ export async function POST(request: Request) {
   if (!userData.user) return NextResponse.json({ error: 'Nicht angemeldet.' }, { status: 401 });
 
   const body = schema.parse(await request.json());
-  const target = new URL(body.imageUrl);
-  const response = await safeFetch(body.imageUrl, {
-    headers: {
-      accept: 'image/avif,image/webp,image/apng,image/png,image/jpeg,image/gif,*/*;q=0.8',
-      referer: `${target.origin}/`,
-      'sec-fetch-dest': 'image',
-      'sec-fetch-mode': 'no-cors',
-      'sec-fetch-site': 'cross-site',
-    }
-  });
-  if (!response.ok) return NextResponse.json({ error: 'Bild konnte nicht geladen werden.' }, { status: 400 });
-  const contentType = response.headers.get('content-type') || 'image/jpeg';
-  if (!contentType.startsWith('image/')) return NextResponse.json({ error: 'URL ist kein Bild.' }, { status: 400 });
-  const arrayBuffer = await response.arrayBuffer();
-  if (arrayBuffer.byteLength > 18 * 1024 * 1024) return NextResponse.json({ error: 'Bild ist zu groß.' }, { status: 400 });
-
-  const input = Buffer.from(arrayBuffer);
+  const fetched = await fetchPublicImage(body.imageUrl, { pageUrl: body.pageUrl, maxBytes: 18 * 1024 * 1024 });
+  const contentType = fetched.contentType;
+  const input = fetched.buffer;
   const meta = await sharp(input).metadata();
   const resized = sharp(input).rotate().resize({ width: 2200, withoutEnlargement: true });
   const stats = await resized.clone().resize(1, 1, { fit: 'fill' }).raw().toBuffer();

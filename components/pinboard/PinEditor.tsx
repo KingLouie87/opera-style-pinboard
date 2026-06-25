@@ -4,7 +4,7 @@ import { FormEvent, type ClipboardEvent, type DragEvent, useEffect, useMemo, use
 import { Eye, FileUp, ImagePlus, Link as LinkIcon, Loader2, Pipette, Sparkles, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/browser';
 import { autoTags, COLOR_PRESETS, inferMediaKind, normalizeOptionalUrl } from '@/lib/media';
-import { proxiedImageUrl } from '@/lib/remote-image';
+import { RemoteImage } from './RemoteImage';
 import { sanitizeTags } from '@/lib/tags';
 import { nextPosition } from '@/lib/position';
 import { Board, BoardSection, LinkPreview, Pin } from '@/lib/types';
@@ -220,7 +220,7 @@ export function PinEditor({ boardId, boards = [], sections, allSections, targetS
 
   async function cacheRemoteImage(imageUrl: string) {
     try {
-      const response = await fetch('/api/cache-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ imageUrl }) });
+      const response = await fetch('/api/cache-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ imageUrl, pageUrl: draft.url || preview?.url || undefined }) });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Bild konnte nicht gespeichert werden.');
       setDraft(current => ({
@@ -234,7 +234,7 @@ export function PinEditor({ boardId, boards = [], sections, allSections, targetS
         cover_focus_y: json.cover_focus_y ?? current.cover_focus_y ?? 50
       }));
     } catch {
-      setDraft(current => current.image_url ? current : { ...current, image_url: proxiedImageUrl(imageUrl), image_path: '' });
+      setDraft(current => current.image_url ? current : { ...current, image_url: imageUrl, image_path: '' });
     }
   }
 
@@ -262,7 +262,7 @@ export function PinEditor({ boardId, boards = [], sections, allSections, targetS
         media_kind: data.mediaKind,
         content_type: data.contentType || '',
         tags: current.tags || (tags.length ? tags.join(', ') : sanitizeTags(autoTags(`${data.title ?? ''} ${data.description ?? ''}`)).join(', ')),
-        image_url: current.image_url || (previewImages[0] ? proxiedImageUrl(previewImages[0]) : '') || current.image_url
+        image_url: current.image_url || previewImages[0] || current.image_url
       }));
       if (previewImages[0] && !draft.image_url) void cacheRemoteImage(previewImages[0]);
     } catch (event) {
@@ -297,14 +297,14 @@ export function PinEditor({ boardId, boards = [], sections, allSections, targetS
     setUploading(true);
     setError('');
     try {
-      const response = await fetch('/api/cache-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ imageUrl }) });
+      const response = await fetch('/api/cache-image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ imageUrl, pageUrl: draft.url || preview?.url || undefined }) });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Bild konnte nicht gespeichert werden.');
       setDraft(current => ({ ...current, image_url: json.image_url, image_path: json.image_path, dominant_color: json.dominant_color || current.dominant_color, color: current.color || json.dominant_color || current.color, aspect_ratio: json.aspect_ratio || current.aspect_ratio, cover_focus_x: json.cover_focus_x ?? current.cover_focus_x ?? 50, cover_focus_y: json.cover_focus_y ?? current.cover_focus_y ?? 50 }));
     } catch (event) {
       // Some sites block server-side image caching even though the image can be
       // displayed in the browser. Do not lose the user's selected cover.
-      setDraft(current => ({ ...current, image_url: proxiedImageUrl(imageUrl), image_path: '', cover_focus_x: current.cover_focus_x ?? 50, cover_focus_y: current.cover_focus_y ?? 50 }));
+      setDraft(current => ({ ...current, image_url: imageUrl, image_path: '', cover_focus_x: current.cover_focus_x ?? 50, cover_focus_y: current.cover_focus_y ?? 50 }));
       setError(event instanceof Error ? `${event.message} Das Bild wird vorerst direkt als Cover verwendet.` : 'Bild konnte nicht zwischengespeichert werden. Es wird direkt als Cover verwendet.');
     } finally {
       setUploading(false);
@@ -507,7 +507,7 @@ export function PinEditor({ boardId, boards = [], sections, allSections, targetS
               onDragLeave={handleCoverDrag}
               onDrop={handleCoverDrop}
             >
-              {draft.image_url ? <img src={proxiedImageUrl(draft.image_url)} alt="Pin Vorschau" referrerPolicy="no-referrer" className="h-full min-h-[320px] w-full object-cover" style={{ objectPosition: `${draft.cover_focus_x ?? 50}% ${draft.cover_focus_y ?? 50}%` }} draggable={false} /> : <div className="text-center text-sm text-[var(--muted)]"><ImagePlus className="mx-auto mb-2" /> Bild hier ablegen oder Datei hochladen</div>}
+              {draft.image_url ? <RemoteImage src={draft.image_url} pageUrl={draft.url || preview?.url} alt="Pin Vorschau" className="h-full min-h-[320px] w-full object-cover" style={{ objectPosition: `${draft.cover_focus_x ?? 50}% ${draft.cover_focus_y ?? 50}%` }} draggable={false} /> : <div className="text-center text-sm text-[var(--muted)]"><ImagePlus className="mx-auto mb-2" /> Bild hier ablegen oder Datei hochladen</div>}
               {coverDragActive && <div className="cover-dropzone-overlay"><ImagePlus /> Bild hier ablegen</div>}
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -545,7 +545,7 @@ export function PinEditor({ boardId, boards = [], sections, allSections, targetS
                 <button type="button" onClick={() => loadPreview()} disabled={loadingPreview || !draft.url.trim()} className="btn-ghost px-4 py-3 text-sm font-semibold disabled:opacity-50">{loadingPreview ? <Loader2 className="animate-spin" size={17} /> : <Sparkles size={17} />} Erneut</button>
               </div>
               <p className="mt-2 text-xs text-[var(--muted)]">{loadingPreview ? 'Analyse läuft automatisch ...' : 'Beim Einfügen einer gültigen URL startet die Analyse automatisch.'}</p>
-              {preview && <div className="image-picker-scroll mt-4"><ImagePicker images={preview.images} selected={draft.image_url} onSelect={chooseRemoteImage} disabled={uploading} /></div>}
+              {preview && <div className="image-picker-scroll mt-4"><ImagePicker images={preview.images} selected={draft.image_url} pageUrl={preview.url || draft.url} onSelect={chooseRemoteImage} disabled={uploading} /></div>}
             </section>
 
             <section className="grid gap-4 md:grid-cols-2">

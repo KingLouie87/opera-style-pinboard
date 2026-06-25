@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { ArrowLeft, RotateCcw, Trash2 } from 'lucide-react';
 import { Board, Pin } from '@/lib/types';
 import { createClient } from '@/lib/supabase/browser';
-import { proxiedImageUrl } from '@/lib/remote-image';
+import { RemoteImage } from './RemoteImage';
 import { ConfirmDialog } from './ConfirmDialog';
 
 type ConfirmState = null | { title: string; message: string; confirmLabel?: string; onConfirm: () => void };
@@ -67,7 +67,7 @@ export function ArchiveView({ boards: initialBoards, pins: initialPins }: { boar
         <h2 className="mb-3 mt-8 text-xl font-semibold tracking-[-0.04em]">Pins</h2>
         <div className="archive-grid">
           {pins.map(pin => <article key={pin.id} className="archive-card">
-            {pin.image_url && <img src={proxiedImageUrl(pin.image_url)} alt="" className="mb-3 h-36 w-full rounded-[7px] object-cover" />}
+            {pin.image_url && <RemoteImage src={pin.image_url} pageUrl={pin.url} alt="" className="mb-3 h-36 w-full rounded-[7px] object-cover" />}
             <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">Pin</p>
             <h3 className="mt-2 text-lg font-semibold">{pin.title || 'Unbenannter Pin'}</h3>
             {pin.description && <p className="mt-1 line-clamp-3 text-sm text-[var(--muted)]">{pin.description}</p>}

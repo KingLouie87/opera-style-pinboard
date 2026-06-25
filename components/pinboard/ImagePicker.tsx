@@ -2,9 +2,10 @@
 
 import { Check, Image as ImageIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { proxiedImageUrl, sameImageReference } from '@/lib/remote-image';
+import { sameImageReference } from '@/lib/remote-image';
+import { RemoteImage } from './RemoteImage';
 
-export function ImagePicker({ images, selected, disabled, onSelect }: { images: string[]; selected: string; disabled?: boolean; onSelect: (url: string) => void }) {
+export function ImagePicker({ images, selected, pageUrl, disabled, onSelect }: { images: string[]; selected: string; pageUrl?: string | null; disabled?: boolean; onSelect: (url: string) => void }) {
   const [broken, setBroken] = useState<Set<string>>(() => new Set());
   const unique = useMemo(() => Array.from(new Set(images)).filter(Boolean).slice(0, 60), [images]);
   const visible = unique.filter(image => !broken.has(image));
@@ -29,7 +30,6 @@ export function ImagePicker({ images, selected, disabled, onSelect }: { images: 
       <div className="image-picker-grid board-scroll" role="listbox" aria-label="Cover-Bild auswählen">
         {visible.map((image) => {
           const isSelected = sameImageReference(selected, image);
-          const displayUrl = proxiedImageUrl(image);
           return (
             <button
               key={image}
@@ -40,13 +40,14 @@ export function ImagePicker({ images, selected, disabled, onSelect }: { images: 
               title={isSelected ? 'Ausgewähltes Cover' : 'Als Cover verwenden'}
               aria-pressed={isSelected}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={displayUrl}
+              <span className="image-picker-loading" aria-hidden="true" />
+              <RemoteImage
+                src={image}
+                pageUrl={pageUrl}
                 alt=""
                 loading="lazy"
-                referrerPolicy="no-referrer"
-                onError={() => setBroken(current => new Set(current).add(image))}
+                hideUntilLoaded
+                onBroken={() => setBroken(current => new Set(current).add(image))}
               />
               <span className="image-picker-state">{isSelected ? <><Check size={13} /> Ausgewählt</> : 'Verwenden'}</span>
             </button>
